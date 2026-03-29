@@ -1,6 +1,6 @@
 ---
 
-# Ref: github-label-sync --access-token "$(gh auth token)" --labels .gh-labels.yml amannocci/ignity
+# Ref: github-label-sync --access-token "$(gh auth token)" --labels .gh-labels.yml techcode-io/ignity
 
 - name: "platform: all"
   color: "d93f0b"

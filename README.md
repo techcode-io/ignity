@@ -7,11 +7,11 @@
 </p>
 
 <h4 align="center">
-  <a href="[https://github.com/amannocci/ignity/actions/workflows/ci.yml](https://github.com/amannocci/ignity/actions/workflows/ci.yml)">
-    <img src="https://img.shields.io/github/actions/workflow/status/amannocci/ignity/ci.yml?branch=main&label=ci&style=flat-square" alt="continuous integration" style="height: 20px;">
+  <a href="[https://github.com/techcode-io/ignity/actions/workflows/ci.yml](https://github.com/techcode-io/ignity/actions/workflows/ci.yml)">
+    <img src="https://img.shields.io/github/actions/workflow/status/techcode-io/ignity/ci.yml?branch=main&label=ci&style=flat-square" alt="continuous integration" style="height: 20px;">
   </a>
-  <a href="https://github.com/amannocci/ignity/graphs/contributors">
-    <img src="https://img.shields.io/github/contributors-anon/amannocci/ignity?color=yellow&style=flat-square" alt="contributors" style="height: 20px;">
+  <a href="https://github.com/techcode-io/ignity/graphs/contributors">
+    <img src="https://img.shields.io/github/contributors-anon/techcode-io/ignity?color=yellow&style=flat-square" alt="contributors" style="height: 20px;">
   </a>
   <a href="https://opensource.org/licenses/Apache-2.0">
     <img src="https://img.shields.io/badge/apache%202.0-blue.svg?style=flat-square&label=license" alt="license" style="height: 20px;">
@@ -19,8 +19,8 @@
   <br>
 </h4>
 
-- [Source](https://github.com/amannocci/ignity)
-- [Issues](https://github.com/amannocci/ignity/issues)
+- [Source](https://github.com/techcode-io/ignity)
+- [Issues](https://github.com/techcode-io/ignity/issues)
 - [Contact](mailto:adrien.mannocci@gmail.com)
 
 ## :package: Prerequisites
@@ -48,7 +48,7 @@
 
 The following steps will ensure your project is cloned properly.
 
-1. `git clone https://github.com/amannocci/ignity`
+1. `git clone https://github.com/techcode-io/ignity`
 2. `cd ignity && task setup`
 
 ### Test
@@ -286,8 +286,8 @@ notifications about new versions, and give it a :star2: **GitHub Star**!
 
 You can also contribute by:
 
-- Sending a [Pull Request](https://github.com/amannocci/ignity/pulls) with your awesome new features and bug fixed.
-- Be part of the community and help resolve [Issues](https://github.com/amannocci/ignity/issues).
+- Sending a [Pull Request](https://github.com/techcode-io/ignity/pulls) with your awesome new features and bug fixed.
+- Be part of the community and help resolve [Issues](https://github.com/techcode-io/ignity/issues).
 
 ## 🧾 License
 
