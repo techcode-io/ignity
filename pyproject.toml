@@ -1,0 +1,32 @@
+[project]
+name = "ignity"
+version = "0.1.0"
+description = "Dead simple process supervision for containers based on s6"
+readme = "README.md"
+requires-python = ">=3.13"
+dependencies = []
+
+[dependency-groups]
+dev = [
+    "pre-commit>=4.5",
+    "poethepoet>=0.42",
+    "pytest>=8.0",
+]
+
+[tool.uv]
+package = false
+
+[tool.poe.tasks."env:configure"]
+help = "Setup project environment"
+cmd = "pre-commit install"
+
+[tool.poe.tasks."test"]
+help = "Run all tests."
+cmd = "pytest tests"
+
+[tool.poe.tasks.package]
+help = "Package source into dist/ignity.tar.gz"
+sequence = [
+    { shell = "rm -rf dist && mkdir -p dist" },
+    { cmd = "tar zcvf dist/ignity.tar.gz -C src/ ." },
+]

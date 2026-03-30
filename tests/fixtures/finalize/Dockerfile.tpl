@@ -4,4 +4,4 @@ FROM {{DOCKER_BASE_IMAGE}}
 # Install ignity
 COPY src/ /
 RUN bash /usr/src/install-ignity.sh
-COPY tests/finalize/rootfs/ /
+COPY tests/fixtures/finalize/rootfs/ /

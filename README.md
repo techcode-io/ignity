@@ -25,7 +25,7 @@
 
 ## :package: Prerequisites
 
-- [Taskfile](https://taskfile.dev/) for development.
+- [uv](https://docs.astral.sh/uv/getting-started/installation/) for development.
 - [Podman](https://podman.io/docs/installation) for development.
 
 ## :sparkles: Features
@@ -49,14 +49,14 @@
 The following steps will ensure your project is cloned properly.
 
 1. `git clone https://github.com/techcode-io/ignity`
-2. `cd ignity && task setup`
+2. `cd ignity && uv run poe env:configure`
 
 ### Test
 
 - To test you have to use the workflow script.
 
 ```bash
-task test
+uv run poe test
 ```
 
 - It will test project code with the current environment.
@@ -66,7 +66,7 @@ task test
 - To package you have to use the workflow script.
 
 ```bash
-task package
+uv run poe package
 ```
 
 - It will create a tar archive containing ignity.
