@@ -178,7 +178,7 @@ pkg::install "s6-portable-utils" "${S6_PORTABLE_UTILS_VERSION}" "${S6_PORTABLE_U
 
 # Diff to do iso uninstall
 dpkg -l | awk '{print $2;}' > /tmp/after
-BUILD_DEPENDENCIES=$(diff /tmp/before /tmp/after | grep ">" | awk '{print $2;}')
+BUILD_DEPENDENCIES=$(diff /tmp/before /tmp/after | grep ">" | awk '{print $2;}' || true)
 
 # Purge build dependencies and cleanup apt
 apt-get purge -y --auto-remove ${BUILD_DEPENDENCIES}
