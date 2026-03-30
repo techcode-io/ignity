@@ -30,3 +30,11 @@ sequence = [
     { shell = "rm -rf dist && mkdir -p dist" },
     { cmd = "tar zcvf dist/ignity.tar.gz -C src/ ." },
 ]
+
+[tool.poe.tasks."project:check"]
+help = "Check for s6 ecosystem package updates without applying"
+script = "scripts.project:upgrade(dry_run=True)"
+
+[tool.poe.tasks."project:upgrade"]
+help = "Upgrade s6 ecosystem package versions in install-ignity.sh"
+script = "scripts.project:upgrade(dry_run=False)"
