@@ -22,6 +22,7 @@
 - [Source](https://github.com/techcode-io/ignity)
 - [Issues](https://github.com/techcode-io/ignity/issues)
 - [Contact](mailto:adrien.mannocci@gmail.com)
+- [Maintained by techcode.io](https://techcode.io)
 
 ## :package: Prerequisites
 
