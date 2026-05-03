@@ -9,7 +9,7 @@ dependencies = []
 [dependency-groups]
 dev = [
     "pre-commit>=4.6.0",
-    "poethepoet>=0.44.0",
+    "poethepoet>=0.45.0",
     "pytest>=9.0.3",
 ]
 
