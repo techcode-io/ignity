@@ -38,7 +38,7 @@ foreground {
 
   # The init is complete, If the user has a given CMD, run it now, then kill everything when it exits.
   if -t { eltest $# -ne 0 }
-  foreground { with-env s6-setsid -gq -- $@ }
+  foreground { with-env s6-setsid -gq -d 0 -- $@ }
 
   importas -u ? ?
   foreground { s6-echo -- "[supervisor/cmd] ${1} exited ${?}" }
