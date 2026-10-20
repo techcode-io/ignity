@@ -10,13 +10,24 @@ importas -D 0 USERMAP_GID USERMAP_GID
 # This env decides if we should fix permissions or not (default no)
 importas -D 0 IGNITY_SKIP_PERMS IGNITY_SKIP_PERMS
 
+# This env, when set, is where to write the account files instead of creating the user in /etc,
+# which a read-only root filesystem doesn't allow (see gen-accounts)
+importas -D "" IGNITY_ACCOUNTS_DIR IGNITY_ACCOUNTS_DIR
+
 ifelse {
   eltest ${IGNITY_SKIP_PERMS} -eq 1
 } {
   $@
 }
 
+if {
+  ifelse { eltest -z ${IGNITY_ACCOUNTS_DIR} } { exit 0 }
+  ifelse { redirfd -a 2 /dev/null redirfd -a 1 /dev/null id -u "${USER}" } { exit 0 }
+  gen-accounts
+}
+
 foreground {
+  ifelse { eltest -n ${IGNITY_ACCOUNTS_DIR} } { exit 0 }
   if -n { redirfd -a 2 /dev/null redirfd -a 1 /dev/null id -u "${USER}" }
   if { groupadd -g "${USERMAP_GID}" "${USER}" }
   if { useradd -M -u "${USERMAP_UID}" -g "${USERMAP_GID}" -s /bin/false "${USER}" }

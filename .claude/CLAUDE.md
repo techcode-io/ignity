@@ -17,7 +17,7 @@ uv run poe env:configure    # Install pre-commit hooks
 
 **Testing:**
 ```bash
-uv run poe test             # Run full pytest suite (builds 7 container images, 23 tests)
+uv run poe test             # Run full pytest suite (builds 9 container images)
 uv run poe test tests/test_boot.py::test_execlineb_installed  # Single test
 ```
 
@@ -35,36 +35,48 @@ All commands require:
 
 Ignity supervises container processes through three discrete stages:
 
-**Stage 1 (`/etc/s6/boot/stage1`):** Setup
-- Creates s6 supervision tree directories
-- Initializes `/run/ignity/{envs,init,finalize,services,services-state}`
+**Stage 1 (`/etc/s6/boot/stage1`):** Setup (PID 1)
 - Runs preboot (user/permission setup) if needed
-- Delegates to stage 2
+- Validates `IGNITY_MODE` (`full` | `init` | `services`), fails fast otherwise
+- Initializes `/run/ignity/{init,finalize,services,services-state}`
+- `stage1-envs`: Builds non-secret defaults in `/run/ignity/envs-defaults` from `/etc/ignity/envs/*` (in order, container env wins, container env is never written to disk). They are applied with `s6-envdir` before `s6-svscan`, so every process inherits them
+- Forks stage 2, then runs `s6-svscan` on `/run/ignity/services-state`
 
-**Stage 2 (`/etc/s6/boot/stage2`):** Service & CMD Execution
-- `stage2-envs`: Loads `/etc/ignity/envs/*` files in order (inheritance pattern)
-- `stage2-init`: Executes `/etc/ignity/init/*` scripts in order
-- `stage2-services`: Starts s6-supervised services from `/etc/ignity/services/`
-- Optionally runs CMD after services healthy (configurable delay via `IGNITY_CMD_WAIT_FOR_SERVICES`)
+**Stage 2 (`/etc/s6/boot/stage2`):** Service & CMD Execution (depends on `IGNITY_MODE`)
+- `stage2-copy`: Copies `/etc/ignity/{init,finalize,services}` to `/run/ignity`, only what the mode needs
+- `stage2-init`: Executes the `/run/ignity/init/*` copies of `/etc/ignity/init/*` in order (skipped in `services` mode)
+- `stage2-cmd`: Runs the CMD, dropping to `USERMAP_UID:USERMAP_GID` via `s6-applyuidgid` only if PID 1 is root and the mapping isn't 0:0 (supplementary groups set to the gid)
+- `stage2-services`: Copies `/run/ignity/services/*` into the live scandir `/run/ignity/services-state` and starts them under s6 (skipped in `init` mode)
+- Optionally runs CMD after services healthy (configurable delay via `IGNITY_CMD_WAIT_FOR_SERVICES`); skipped in `init` mode
+- Writes the exit status to `/run/ignity/stage2-exited` for stage 3; a failure (or `init` mode completing) stops the supervision tree
+
+| `IGNITY_MODE` | Runs | Use |
+|---|---|---|
+| `full` (default) | init -> services -> CMD | Docker, Swarm, single container |
+| `init` | init only, then exit (non-zero if a script failed) | Kubernetes init container |
+| `services` | services -> CMD (+ finalize) | Kubernetes main container |
+
+Containers of a pod share files through a user-mounted volume. No env is handed over between them, so secrets given to the init container stay there.
 
 **Stage 3 (`/etc/s6/boot/stage3`):** Shutdown
 - Brings down all services gracefully
-- Runs `/etc/ignity/finalize/*` scripts in parallel
-- Kills remaining processes, exits
+- Runs the `/run/ignity/finalize/*` copies of `/etc/ignity/finalize/*` in parallel
+- Kills remaining processes, exits with the code stored in `/run/ignity/stage2-exited` (default 0)
 
 ## Key Components
 
 **Boot Stages:**
 - `/init` — Entry point (execlineb wrapper calling stage1)
 - `/etc/s6/boot/stage{1,2,3}` — Core boot logic
-- `/etc/s6/boot/stage2-{envs,init,services}` — Stage 2 sub-scripts
+- `/etc/s6/boot/stage1-envs`, `/etc/s6/boot/stage2-{copy,init,services,cmd}` — Boot sub-scripts
 - `/etc/s6/services/.s6-svscan/{crash,finish}` — s6 supervision control
 
 **Utilities:**
 - `/usr/bin/preboot` — Non-root user setup (UID/GID mapping)
-- `/usr/bin/fix-perms` — Apply permission fixes from spec files
+- `/usr/bin/gen-accounts` — With `IGNITY_ACCOUNTS_DIR` set (called by preboot): writes passwd/group copies completed with USER there instead of useradd, for read-only roots; the main container mounts them over /etc/passwd and /etc/group (subPath)
+- `/usr/bin/fix-perms` — Apply permission fixes from spec files (never follows symlinks: `chown -h`, symlinks skipped for `chmod`, top-level path resolved once)
 - `/usr/bin/load-envfile` — Load environment variables from files
-- `/usr/bin/with-env` — Inject environment variables into command execution
+- `/usr/bin/with-env` — POSIX sh. Passthrough by default; `-k <patterns>` narrows the inherited env (PATH always kept), `-d <dir>` loads an envdir (repeatable, applied after `-k`, in order) for that process only (scoped secrets)
 - `/usr/bin/with-retries` — Retry command execution with backoff
 
 **Installation:**
@@ -89,13 +101,13 @@ Scripts use numbered prefixes (00-, 01-, etc.) for deterministic ordering. Conve
 **Framework:** pytest + Podman integration tests
 
 **Structure:**
-- 7 test modules in `/tests/`: `test_boot.py`, `test_init.py`, `test_envs.py`, `test_perms.py`, `test_services.py`, `test_preboot.py`, `test_finalize.py`
-- Each module builds its own container image dynamically from `tests/fixtures/<kind>/Dockerfile.tpl`
+- 9 test modules in `/tests/`: `test_boot.py`, `test_init.py`, `test_envs.py`, `test_perms.py`, `test_services.py`, `test_preboot.py`, `test_finalize.py`, `test_modes.py`, `test_least_privilege.py`
+- Each module sets `IMAGE_KIND`; the shared `image` fixture (conftest) builds it from `tests/fixtures/<kind>/`: its own `Containerfile.tpl` if present, else ignity + `rootfs/` (see `DEFAULT_CONTAINERFILE`). Extra images can still be built with `build_image()`
 - Test fixtures include rootfs overlays with pre-configured services/scripts
-- conftest.py provides `build_image(kind)` and `run_in_container(image, cmd)` helpers
+- conftest.py provides the `image` fixture, `build_image(kind)`, `run_in_container(image, cmd, extra_args)`, `env_args(**env)` (`-e` arguments) and `READ_ONLY` (read-only root arguments)
 
 **Test Flow:**
-1. `build_image()` renders Dockerfile.tpl (substitutes `{{DOCKER_BASE_IMAGE}}`), builds with random tag via podman
+1. `build_image()` renders Containerfile.tpl (substitutes `{{DOCKER_BASE_IMAGE}}`), builds with random tag via podman
 2. `run_in_container()` executes shell command inside container with `/init` entrypoint
 3. Tests assert on exit codes and stdout content
 
@@ -115,7 +127,7 @@ Follow conventional commits: `type: description` (types: build, ci, docs, feat, 
 **Key Files:**
 - `pyproject.toml` — Project manifest, poe tasks, uv config
 - `tests/conftest.py` — Pytest helpers, immutable tuples, type annotations
-- `tests/fixtures/` — Dockerfile templates and rootfs overlays (not actual test code)
+- `tests/fixtures/` — Containerfile templates and rootfs overlays (not actual test code)
 - `.github/workflows/ci.yml` — Runs `uv run poe test` on PR/push
 
 **Environment Variables (Runtime):**
@@ -123,9 +135,11 @@ Follow conventional commits: `type: description` (types: build, ci, docs, feat, 
 - `IGNITY_CMD_WAIT_FOR_SERVICES_MAXTIME` — Wait timeout in milliseconds (default 5000)
 - `IGNITY_KILL_GRACETIME` — Shutdown grace period in ms (default 3000)
 - `IGNITY_KILL_FINALIZE_MAXTIME` — Max time for finalize scripts in ms (default 5000)
-- `IGNITY_SERVICES_GRACETIME` — Service shutdown grace period in ms (default 5000)
+- `IGNITY_SERVICES_GRACETIME` — Service shutdown grace period in ms (default 16000)
 - `IGNITY_SKIP_PERMS` — Skip permission fixing (0/1)
-- `USER`, `USERMAP_UID`, `USERMAP_GID` — Non-root user mapping
+- `IGNITY_ACCOUNTS_DIR` — Write account files there instead of creating USER in /etc (read-only root filesystem, see `gen-accounts`)
+- `IGNITY_MODE` — `full` (default) | `init` (init scripts only, then exit) | `services` (skip init scripts); for Kubernetes init containers. No env is handed between containers, share files through a volume
+- `USER`, `USERMAP_UID`, `USERMAP_GID` — Non-root user mapping; also the uid/gid the CMD drops to (`stage2-cmd`) when PID 1 is root and the mapping isn't 0:0
 
 ## Language & Implementation Details
 

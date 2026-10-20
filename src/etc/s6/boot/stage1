@@ -3,16 +3,24 @@
 # Use preboot to setup user
 preboot
 
+# IGNITY_MODE selects which phases this container runs: full (default), init or services
+importas -D full IGNITY_MODE IGNITY_MODE
+if {
+  ifelse { eltest ${IGNITY_MODE} = full -o ${IGNITY_MODE} = init -o ${IGNITY_MODE} = services } { exit 0 }
+  fdmove -c 1 2
+  foreground { s6-echo "[supervisor/boot] Invalid IGNITY_MODE '${IGNITY_MODE}' (expected: full, init or services)" }
+  exit 1
+}
+
 ## For consistency cleanup ignity run directory
 if {
   elglob -0 g "/run/ignity/*"
   forx -o 0 d { ${g} }
   importas -ui d d
-  s6-rmrf -- ${d}
+  s6-rmrf ${d}
 }
 
 # Setup ignity context
-if { s6-mkdir -pm 0755 -- /run/ignity/envs }
 if { s6-mkdir -pm 0755 -- /run/ignity/init }
 if { s6-mkdir -pm 0755 -- /run/ignity/finalize }
 if { s6-mkdir -pm 0755 -- /run/ignity/services }
@@ -20,6 +28,12 @@ if { s6-mkdir -pm 0755 -- /run/ignity/services-state }
 
 # Init the scandir with our base services
 if { s6-hiercopy /etc/s6/services /run/ignity/services-state }
+
+# Build the default environment from /etc/ignity/envs files
+if { /etc/s6/boot/stage1-envs }
+
+# Make those defaults part of the environment inherited by everything below
+s6-envdir -f /run/ignity/envs-defaults
 
 ## Fork the "stage2" script
 background { /etc/s6/boot/stage2 $@ }

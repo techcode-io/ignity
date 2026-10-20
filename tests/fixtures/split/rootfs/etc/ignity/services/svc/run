@@ -1,0 +1,3 @@
+#!/usr/bin/with-env bash
+echo "split service started"
+sleep infinity

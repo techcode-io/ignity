@@ -1,0 +1,2 @@
+#!/usr/bin/with-env bash
+echo "split finalize ran"

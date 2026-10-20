@@ -1,17 +1,8 @@
 """Tests for s6 services management."""
 
-import subprocess
+from conftest import run_in_container
 
-import pytest
-
-from conftest import build_image, run_in_container
-
-
-@pytest.fixture(scope="module")
-def image():
-    name = build_image("services")
-    yield name
-    subprocess.run(["podman", "rmi", "-f", name], check=False)
+IMAGE_KIND = "services"
 
 
 def test_default_service_ran(image):
