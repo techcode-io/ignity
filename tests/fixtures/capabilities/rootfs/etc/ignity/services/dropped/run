@@ -1,0 +1,5 @@
+#!/bin/sh
+# A service dropping privileges, like the ones that run as their own uid.
+# `wait` returns as soon as the trap fires, a foreground `sleep` would delay it by up to a second
+# and the shutdown (IGNITY_KILL_GRACETIME=0 in the tests) would kill the service first.
+exec s6-setuidgid nobody sh -c 'trap "echo dropped service got TERM; exit 0" TERM; echo dropped service started; while :; do sleep 1 & wait $!; done'

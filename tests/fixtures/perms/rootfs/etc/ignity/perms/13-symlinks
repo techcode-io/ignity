@@ -1,0 +1,2 @@
+/var/www/symlink-dir 1234:1234 0600 0700
+/var/www/top-link 0:0 0600 0700

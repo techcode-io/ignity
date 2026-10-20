@@ -1,50 +1,50 @@
 #!/bin/execlineb -S0
 
 # This file is executed (not as process 1!) as soon as s6-svscan
-# starts, with the original stdin/out/err, but NOT the original environment.
+# starts, with the original stdin/out/err and the environment of stage 1.
 # Purpose of this file: to perform all the one-time initialization tasks.
+
+# IGNITY_MODE (validated in stage 1):
+#  - full:     init scripts, services, then CMD
+#  - init:     init scripts only, then exit (e.g. a Kubernetes init container)
+#  - services: services, then CMD (init scripts are skipped)
+importas -D full IGNITY_MODE IGNITY_MODE
 
 foreground {
   if {
     foreground {
-      # Copy user provided files to /run/ignity.
+      # Copy user provided files to /run/ignity, only the ones this mode needs.
       if {
-        foreground {
-          forx i { "init" "finalize" "services" }
-          importas -u i i
-          if { eltest -d /etc/ignity/${i} }
-          # although s6-hiercopy is prefered, and until it doesn't support 'follow symlinks'
-          # option, there is no clean way to allow symlinks between user provided runcoms.
-          if { s6-hiercopy /etc/ignity/${i} /run/ignity/${i} }
-        }
-        importas -u ? ?
-        exit ${?}
+        if { ifelse { eltest ${IGNITY_MODE} = services } { exit 0 } /etc/s6/boot/stage2-copy init }
+        if { ifelse { eltest ${IGNITY_MODE} = init } { exit 0 } /etc/s6/boot/stage2-copy finalize }
+        ifelse { eltest ${IGNITY_MODE} = init } { exit 0 } /etc/s6/boot/stage2-copy services
       }
 
-      # envs: apply user-provided ownership & permission fixes
-      /etc/s6/boot/stage2-envs
-
       # init: one-time init scripts
-      /etc/s6/boot/stage2-init
-
       # services: long-lived processes to be supervised
-      /etc/s6/boot/stage2-services
+      ifelse { eltest ${IGNITY_MODE} = init } { /etc/s6/boot/stage2-init }
+      ifelse { eltest ${IGNITY_MODE} = services } { /etc/s6/boot/stage2-services }
+      /etc/s6/boot/stage2-init /etc/s6/boot/stage2-services
     }
 
     importas -u ? ?
-    foreground { redirfd -w 1 /run/ignity/envs/IGNITY_STAGE2_EXITED s6-echo -n -- "${?}" }
+    foreground { redirfd -w 1 /run/ignity/stage2-exited s6-echo -n -- "${?}" }
     exit ${?}
   }
 
+  # Nothing is left to supervise in init mode, stop the supervision tree.
+  # A failure of the init scripts is handled below, the same way.
+  ifelse { eltest ${IGNITY_MODE} = init } { s6-svscanctl -t /run/ignity/services-state }
+
   # The init is complete, If the user has a given CMD, run it now, then kill everything when it exits.
   if -t { eltest $# -ne 0 }
-  foreground { with-env s6-setsid -gq -d 0 -- $@ }
+  foreground { s6-setsid -gq -d 0 -- /etc/s6/boot/stage2-cmd $@ }
 
   importas -u ? ?
   foreground { s6-echo -- "[supervisor/cmd] ${1} exited ${?}" }
 
   # Make CMD exit code available in stage3
-  foreground { redirfd -w 1 /run/ignity/envs/IGNITY_STAGE2_EXITED s6-echo -n -- "${?}" }
+  foreground { redirfd -w 1 /run/ignity/stage2-exited s6-echo -n -- "${?}" }
 
   # Stop supervision tree
   foreground { s6-svscanctl -tb /run/ignity/services-state }

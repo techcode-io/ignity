@@ -1,0 +1,4 @@
+#!/usr/bin/with-env bash
+mkdir -p /shared
+echo -n "from-init" > /shared/marker
+echo "run" >> /shared/runs

@@ -1,0 +1,36 @@
+#!/bin/execlineb -S0
+
+# Build /run/ignity/envs-defaults from the /etc/ignity/envs files, in order (later files win).
+# Only the variables defined by those files are stored. The container environment is never
+# copied to disk, and any variable already defined in it is dropped so that it always wins.
+
+if { s6-mkdir -pm 0700 -- /run/ignity/envs-defaults }
+
+if {
+  if -t { eltest -d /etc/ignity/envs }
+  if { s6-echo "[supervisor/env] Loading environment files" }
+  if {
+    elglob -s -0 g "/etc/ignity/envs/*"
+    forx -o 0 d { ${g} }
+    importas -ui d d
+    backtick -n i { s6-basename "${d}" }
+    importas -ui file i
+    # Parse each file in an empty environment so that only its own variables get dumped
+    redirfd -r 0 /etc/ignity/envs/${file}
+    emptyenv -p
+    load-envfile
+    if { s6-dumpenv "/run/ignity/envs-defaults" }
+  }
+  # PATH is only there because of the parser, never a default
+  if { s6-rmrf /run/ignity/envs-defaults/PATH }
+  if {
+    elglob -s -0 g "/run/ignity/envs-defaults/*"
+    forx -o 0 d { ${g} }
+    importas -ui d d
+    backtick -n i { s6-basename "${d}" }
+    importas -ui i i
+    # Variable already set in the container environment: it wins over the file
+    foreground { importas -ui v ${i} s6-rmrf /run/ignity/envs-defaults/${i} }
+  }
+  s6-echo -- "[supervisor/env] Environment files loaded"
+}

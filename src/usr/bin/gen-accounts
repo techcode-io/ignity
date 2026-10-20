@@ -1,0 +1,55 @@
+#!/bin/execlineb -P
+
+#
+# gen-accounts
+#
+# For a read-only root filesystem, where the user can't be created in /etc: write a copy of
+# /etc/passwd and /etc/group completed with USER (uid USERMAP_UID, gid USERMAP_GID) in
+# IGNITY_ACCOUNTS_DIR. Run it in an init container, then mount the two files over /etc/passwd and
+# /etc/group (subPath) in the containers that need the account.
+#
+# Called by preboot when IGNITY_ACCOUNTS_DIR is set and USER doesn't exist.
+#
+
+/bin/export PATH /usr/bin:/bin
+
+importas -u IGNITY_ACCOUNTS_DIR IGNITY_ACCOUNTS_DIR
+importas -D root -u USER USER
+importas -D 0 -u USERMAP_UID USERMAP_UID
+importas -D 0 -u USERMAP_GID USERMAP_GID
+
+# The values end up in colon separated files, don't let them add anything else to them.
+# grep -z makes the whole value a single record, so a newline can't hide a second line.
+if {
+  ifelse { pipeline { s6-echo -n -- ${USER} } grep -Eqzx "[A-Za-z_][A-Za-z0-9_-]*" } { exit 0 }
+  fdmove -c 1 2
+  foreground { s6-echo -- "[supervisor/accounts] Invalid USER" }
+  exit 1
+}
+if {
+  ifelse { eltest ${USERMAP_UID} -ge 0 -a ${USERMAP_GID} -ge 0 } { exit 0 }
+  fdmove -c 1 2
+  foreground { s6-echo -- "[supervisor/accounts] USERMAP_UID and USERMAP_GID must be numbers" }
+  exit 1
+}
+
+if { s6-mkdir -pm 0755 -- ${IGNITY_ACCOUNTS_DIR} }
+if { cp /etc/passwd ${IGNITY_ACCOUNTS_DIR}/passwd }
+if { cp /etc/group ${IGNITY_ACCOUNTS_DIR}/group }
+
+# Like groupadd does not, never create a second account for an existing gid or name
+if {
+  ifelse { redirfd -w 1 /dev/null getent group ${USERMAP_GID} } { exit 0 }
+  ifelse { redirfd -w 1 /dev/null getent group ${USER} } { exit 0 }
+  redirfd -a 1 ${IGNITY_ACCOUNTS_DIR}/group
+  s6-echo -- "${USER}:x:${USERMAP_GID}:"
+}
+
+# Same thing for the uid. No home directory is created, like useradd -M
+if {
+  ifelse { redirfd -w 1 /dev/null getent passwd ${USERMAP_UID} } { exit 0 }
+  redirfd -a 1 ${IGNITY_ACCOUNTS_DIR}/passwd
+  s6-echo -- "${USER}:x:${USERMAP_UID}:${USERMAP_GID}::/home/${USER}:/bin/false"
+}
+
+s6-echo -- "[supervisor/accounts] Account files written in ${IGNITY_ACCOUNTS_DIR}"

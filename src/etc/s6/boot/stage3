@@ -3,8 +3,9 @@
 # This is the shutdown script, running as process 1.
 cd /
 
-# Merge environments from our custom stage into current context
-with-env
+# Use CMD exit code (written by stage2) defaulting to zero if not present.
+backtick -D 0 STAGE2_EXITED { redirfd -r 0 /run/ignity/stage2-exited s6-cat }
+importas -u STAGE2_EXITED STAGE2_EXITED
 
 # This env decides if we should call s6-sync or not (default no)
 importas -D 1 -u IGNITY_SYNC_DISKS IGNITY_SYNC_DISKS
@@ -15,8 +16,10 @@ foreground { /etc/s6/boot/stage3-finalize }
 # Wait service down
 foreground { s6-echo "[supervisor/finalize] Waiting for services" }
 foreground {
-  if { eltest -f /run/ignity/services-state }
+  if { eltest -d /run/ignity/services-state }
   importas -D 16000 -u IGNITY_SERVICES_GRACETIME IGNITY_SERVICES_GRACETIME
+  # s6-svwait -t 0 waits forever: a grace time of 0 means do not wait
+  if { eltest ${IGNITY_SERVICES_GRACETIME} -gt 0 }
   elglob SERVICES /run/ignity/services-state/*
   foreground { s6-svwait -D -t ${IGNITY_SERVICES_GRACETIME} ${SERVICES} }
   s6-sleep -m 200
@@ -53,5 +56,4 @@ foreground {
 }
 
 # Use CMD exit code defaulting to zero if not present.
-importas -u -D 0 IGNITY_STAGE2_EXITED IGNITY_STAGE2_EXITED
-exit ${IGNITY_STAGE2_EXITED}
+exit ${STAGE2_EXITED}

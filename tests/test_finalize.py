@@ -1,17 +1,8 @@
 """Tests for finalize scripts execution."""
 
-import subprocess
+from conftest import run_in_container
 
-import pytest
-
-from conftest import build_image, run_in_container
-
-
-@pytest.fixture(scope="module")
-def image():
-    name = build_image("finalize")
-    yield name
-    subprocess.run(["podman", "rmi", "-f", name], check=False)
+IMAGE_KIND = "finalize"
 
 
 def test_finalize_scripts_ran(image):

@@ -6,12 +6,12 @@
 importas -D 0 -u USERMAP_UID USERMAP_UID
 importas -D 0 -u USERMAP_GID USERMAP_GID
 
-# Process each line
-forstdin -N -d"\n" -- line
+# Process each line. Without -o 0 a failing line would be ignored and fix-perms would exit 0
+forstdin -o 0 -N -d"\n" -- line
 importas -d"\n" -n -u line line
 
-# Test each line isn't empty
-if { eltest -n ${line} }
+# Skip empty lines (if -t: a failed test is not an error)
+if -t { eltest -n ${line} }
 
 # Split each line
 multidefine -0 -Cd" \t" -- ${line} { path uidgid fmode dmode }
@@ -23,17 +23,23 @@ importas -u UID_GID UID_GID
 
 multidefine -Cd":" -- ${UID_GID} { uid gid }
 
-# Check path exists
-if { eltest -e ${path} }
+# Skip paths that do not exist
+if -t { eltest -e ${path} }
 
-# Fix owners
-pipeline { find "${path}" ( -not -gid "${gid}" -or -not -uid "${uid}" ) -print0 }
-if { xargs -0 -r -n256 chown "${uid}:${gid}" }
+# Resolve the configured path once, it may legitimately be a symlink (e.g. a volume mount point).
+# From there nothing is followed: a symlink found below is a file like another one, never a way to
+# reach something outside of the path (this runs as root, and the content may be written by others).
+backtick -n real { realpath ${path} }
+importas -u real real
 
-# Fix files permissions
-pipeline { find "${path}" -not -type d -not -perm "${fmode}" -print0 }
+# Fix owners (-h: change the symlink itself, not its target)
+pipeline { find -P "${real}" ( -not -gid "${gid}" -or -not -uid "${uid}" ) -print0 }
+if { xargs -0 -r -n256 chown -h "${uid}:${gid}" }
+
+# Fix files permissions (symlinks have no mode of their own, chmod would change their target)
+pipeline { find -P "${real}" -not -type d -not -type l -not -perm "${fmode}" -print0 }
 if { xargs -0 -r -n256 chmod "${fmode}" }
 
 # Fix directories permissions
-pipeline { find "${path}" -type d -not -perm "${dmode}" -print0 }
+pipeline { find -P "${real}" -type d -not -perm "${dmode}" -print0 }
 if { xargs -0 -r -n256 chmod "${dmode}" }

@@ -1,2 +1,88 @@
-#!/bin/execlineb -S0
-s6-envdir -f /run/ignity/envs $@
+#!/bin/sh
+
+#
+# with-env [-k patterns] [-d dir]... [--] prog [args...]
+#
+# The container environment is inherited by every process, so without option prog just runs as is.
+#
+#   -k patterns  Narrow the inherited environment: keep only the variables matching one of the
+#                comma separated names or globs (e.g. 'HOME,LANG,APP_*'), drop all the others.
+#                PATH is always kept. An empty list keeps PATH only. Can be repeated.
+#   -d dir       Load the files of an envdir (one file per variable: the file name is the variable
+#                name, the content is the value, verbatim). Can be repeated. Applied after narrowing,
+#                in the order given, so a variable of an envdir wins over an inherited one and
+#                an empty file unsets the variable.
+#
+# This is the way to scope secrets provided as files to a single process.
+#
+usage() {
+  echo "usage: with-env [-k patterns] [-d dir]... [--] prog [args...]" >&2
+  exit 64
+}
+
+narrow=0
+keep=""
+dirs_rev=""
+while [ $# -gt 0 ]; do
+  case $1 in
+    -k)
+      [ $# -ge 2 ] || usage
+      narrow=1
+      keep="${keep:+${keep},}$2"
+      shift 2
+      ;;
+    -d)
+      [ $# -ge 2 ] || usage
+      # Prepend so that the list is reversed: it is consumed below by prepending to the command
+      dirs_rev="$2${dirs_rev:+
+}${dirs_rev}"
+      shift 2
+      ;;
+    --)
+      shift
+      break
+      ;;
+    -*)
+      usage
+      ;;
+    *)
+      break
+      ;;
+  esac
+done
+[ $# -ge 1 ] || usage
+
+# Chain one s6-envdir per directory, the first directory given being loaded first
+if [ -n "${dirs_rev}" ]; then
+  while IFS= read -r dir; do
+    set -- s6-envdir -f "${dir}" "$@"
+  done <<EOF
+${dirs_rev}
+EOF
+fi
+
+# Drop every inherited variable that doesn't match the patterns
+if [ "${narrow}" -eq 1 ]; then
+  names=$(awk 'BEGIN { for (name in ENVIRON) print name }')
+  set -f
+  for name in ${names}; do
+    case ${name} in
+      [!A-Za-z_]* | *[!A-Za-z0-9_]* | PATH) continue ;;
+    esac
+    matched=0
+    old_ifs=${IFS}
+    IFS=,
+    for pattern in ${keep}; do
+      # shellcheck disable=SC2254
+      case ${name} in
+        ${pattern}) matched=1 ;;
+      esac
+    done
+    IFS=${old_ifs}
+    [ "${matched}" -eq 1 ] || set -- -u "${name}" "$@"
+  done
+  set +f
+  exec env "$@"
+fi
+
+exec "$@"

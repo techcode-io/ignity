@@ -1,0 +1,16 @@
+#!/bin/execlineb -S0
+
+# Run the CMD, dropping privileges to USERMAP_UID:USERMAP_GID when it makes sense:
+#  - they are both 0 (default): nothing to drop, the CMD runs as root like before
+#  - PID 1 is not root (e.g. USER set in the Dockerfile): it can't change uid, the CMD runs as is
+importas -D 0 USERMAP_UID USERMAP_UID
+importas -D 0 USERMAP_GID USERMAP_GID
+
+backtick -n EUID { id -u }
+importas -u EUID EUID
+
+ifelse { eltest ${EUID} -ne 0 } { $@ }
+ifelse { eltest ${USERMAP_UID} -eq 0 -a ${USERMAP_GID} -eq 0 } { $@ }
+
+# Supplementary groups are explicitly set, otherwise the CMD would keep the ones of root
+s6-applyuidgid -u ${USERMAP_UID} -g ${USERMAP_GID} -G ${USERMAP_GID} $@
