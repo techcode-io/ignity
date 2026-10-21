@@ -6,7 +6,7 @@ This module provides version upgrade functionality for s6 ecosystem packages.
 Can be run locally or in CI to keep dependencies up-to-date.
 
 Usage:
-    from scripts.project import upgrade
+    from scripts.tasks.project import upgrade
     result = upgrade(dry_run=False)
 """
 
@@ -27,7 +27,7 @@ PACKAGES = [
     ("S6_PORTABLE_UTILS_VERSION", "skarnet/s6-portable-utils"),
 ]
 
-INSTALL_SCRIPT = Path(__file__).parent.parent / "src/usr/src/install-ignity.sh"
+INSTALL_SCRIPT = Path(__file__).parent.parent.parent / "src/usr/src/install-ignity.sh"
 
 
 @dataclass

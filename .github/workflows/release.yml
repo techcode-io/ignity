@@ -1,0 +1,76 @@
+---
+name: Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "The next iteration version. This workflow will automatically perform the required version bumps"
+        required: true
+
+permissions:
+  contents: read
+
+env:
+  # Ref: https://docs.astral.sh/uv/concepts/projects/sync/#checking-if-the-lockfile-is-up-to-date
+  UV_FROZEN: "true"
+
+concurrency:
+  group: ${{ github.workflow }}
+
+jobs:
+  ci:
+    permissions:
+      contents: read
+      id-token: write
+      attestations: write
+      artifact-metadata: write
+    uses: ./.github/workflows/ci.yml
+    secrets: inherit
+
+  release:
+    runs-on: ubuntu-latest
+    needs:
+      - ci
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/download-artifact@v8
+        with:
+          pattern: ignity-package-*
+          merge-multiple: true
+          path: dist
+
+      - name: Install environment
+        uses: ./.github/workflows/env-install
+
+      - name: Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: uv run poe release
+
+  post-release:
+    needs:
+      - release
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - name: Setup github actions bot
+        uses: techcode-io/github-actions/setup-github-bot@setup-github-bot/v1
+
+      - name: Install environment
+        uses: ./.github/workflows/env-install
+
+      - name: Run post-release step
+        run: uv run poe release:post
+        env:
+          GH_TOKEN: ${{ github.token }}
+          NEXT_VERSION: ${{ inputs.version }}

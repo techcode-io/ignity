@@ -176,6 +176,10 @@ pkg::install "execline" "${EXECLINE_VERSION}" "${EXECLINE_URL}" "--enable-shared
 pkg::install "s6" "${S6_VERSION}" "${S6_URL}"
 pkg::install "s6-portable-utils" "${S6_PORTABLE_UTILS_VERSION}" "${S6_PORTABLE_UTILS_URL}"
 
+# execline's wait, by the path stage3 calls it with (see distributions/build/build-ignity.sh)
+mkdir -p /usr/libexec/ignity
+ln -sf /bin/wait /usr/libexec/ignity/wait
+
 # Diff to do iso uninstall
 dpkg -l | awk '{print $2;}' > /tmp/after
 BUILD_DEPENDENCIES=$(diff /tmp/before /tmp/after | grep ">" | awk '{print $2;}' || true)

@@ -1,0 +1,10 @@
+# Build the ignity bundle (see build-ignity.sh), copied out of /ignity by scripts/tasks/build.py
+FROM docker.io/library/alpine:3 AS build
+RUN apk add --no-cache bash
+WORKDIR /workspace
+COPY src/ src/
+COPY distributions/build/build-ignity.sh distributions/build/build-ignity.sh
+RUN bash distributions/build/build-ignity.sh /out
+
+FROM scratch
+COPY --from=build /out/ /ignity/

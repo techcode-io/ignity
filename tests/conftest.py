@@ -25,14 +25,54 @@ READ_ONLY: tuple[str, ...] = ("--read-only", "--tmpfs=/run/ignity:exec")
 # Used when tests/fixtures/<kind>/ has no Containerfile.tpl of its own: ignity plus the kind's rootfs
 DEFAULT_CONTAINERFILE: Final[str] = """\
 FROM {{DOCKER_BASE_IMAGE}}
-COPY src/ /
-RUN bash /usr/src/install-ignity.sh
+{{IGNITY_INSTALL}}
 """
+
+# How {{IGNITY_INSTALL}} installs ignity, from IGNITY_INSTALL: built from source (default)
+SOURCE_INSTALL: Final[str] = """\
+COPY src/ /
+RUN bash /usr/src/install-ignity.sh"""
+
+# Or from the package built in dist/ (`poe build` then `poe package:<format>`), by base image family.
+# bash is installed too: test commands are run with it
+PACKAGE_INSTALLS: Final[dict[str, str]] = {
+    "deb": """\
+COPY dist/*.deb /tmp/ignity/
+RUN apt-get update && apt-get install -y --no-install-recommends bash /tmp/ignity/*.deb \\
+ && rm -rf /tmp/ignity /var/lib/apt/lists/*""",
+    "rpm": """\
+COPY dist/*.rpm /tmp/ignity/
+RUN dnf install -y bash /tmp/ignity/*.rpm && dnf clean all && rm -rf /tmp/ignity""",
+    "apk": """\
+COPY dist/*.apk /tmp/ignity/
+RUN apk add --no-cache --allow-untrusted bash /tmp/ignity/*.apk && rm -rf /tmp/ignity""",
+}
+
+# Package format of a base image, from its name
+PACKAGE_FORMATS: Final[dict[str, str]] = {
+    "debian": "deb",
+    "ubuntu": "deb",
+    "fedora": "rpm",
+    "alpine": "apk",
+}
 
 
 def env_args(**env: str | int) -> tuple[str, ...]:
     """Turn keyword arguments into `-e NAME=value` container arguments."""
     return tuple(arg for name, value in env.items() for arg in ("-e", f"{name}={value}"))
+
+
+def ignity_install(base_image: str) -> str:
+    """Containerfile instructions installing ignity on a base image, as IGNITY_INSTALL asks."""
+    install = os.environ.get("IGNITY_INSTALL", "source")
+    if install == "source":
+        return SOURCE_INSTALL
+    if install != "package":
+        raise ValueError(f"IGNITY_INSTALL must be `source` or `package`, not `{install}`")
+    name = base_image.rsplit("/", 1)[-1].split(":", 1)[0]
+    if name not in PACKAGE_FORMATS:
+        raise ValueError(f"No package format known for the `{base_image}` base image")
+    return PACKAGE_INSTALLS[PACKAGE_FORMATS[name]]
 
 
 def build_image(kind: str) -> str:
@@ -48,7 +88,9 @@ def build_image(kind: str) -> str:
         if (fixture_dir / "rootfs").is_dir():
             template += f"COPY tests/fixtures/{kind}/rootfs/ /\n"
     base_image = os.environ.get("DOCKER_BASE_IMAGE", "debian:bookworm-slim")
-    rendered = template.replace("{{DOCKER_BASE_IMAGE}}", base_image)
+    rendered = template.replace("{{DOCKER_BASE_IMAGE}}", base_image).replace(
+        "{{IGNITY_INSTALL}}", ignity_install(base_image)
+    )
     with tempfile.NamedTemporaryFile(
         mode="w", delete=False, suffix=".Containerfile"
     ) as f:

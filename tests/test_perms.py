@@ -28,7 +28,7 @@ def test_multi_uid_gid_permissions(image):
 def test_dynamic_uid_gid_default_owner(image):
     assert (
         run_in_container(
-            image, 'ls -alh /var/www/dynamic-uid-gid | grep -- "root root"'
+            image, 'ls -alh /var/www/dynamic-uid-gid | grep -E -- "root +root"'
         ).returncode
         == 0
     )
@@ -38,7 +38,7 @@ def test_dynamic_uid_gid_custom_owner(image):
     assert (
         run_in_container(
             image,
-            'ls -alh /var/www/dynamic-uid-gid | grep -- "exploit exploit"',
+            'ls -alh /var/www/dynamic-uid-gid | grep -E -- "exploit +exploit"',
             extra_args=_USERMAP_ARGS,
         ).returncode
         == 0
