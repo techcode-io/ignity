@@ -1,8 +1,10 @@
-#!/bin/execlineb
+#!/usr/lib/ignity/bin/execlineb
 
 #
 # with-retries -n numretries -t millisecs prog...
 #
+# Can run outside /init
+/usr/lib/ignity/libexec/with-ignity-path
 elgetopt "n:t:"
 multisubstitute
 {

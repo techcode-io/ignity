@@ -1,8 +1,7 @@
-#!/bin/execlineb -S0
+#!/usr/lib/ignity/bin/execlineb -S0
 
 # This is the shutdown script, running as process 1.
-# execline-cd, not cd: rpm distributions ship a cd of their own (bash), which the ignity rpm leaves in place
-execline-cd /
+cd /
 
 # Use CMD exit code (written by stage2) defaulting to zero if not present.
 backtick -D 0 STAGE2_EXITED { redirfd -r 0 /run/ignity/stage2-exited s6-cat }
@@ -50,8 +49,7 @@ s6-sleep -m 200
 foreground { redirfd -a 2 /dev/null redirfd -a 1 /dev/null s6-nuke -k } # foreground is process 1: it survives again
 
 # Reap all the zombies then sync, and we're done.
-# execline's wait by its own path: rpm distributions ship a wait of their own (bash), which the ignity rpm leaves in place
-/usr/libexec/ignity/wait { }
+wait { }
 foreground {
   if { eltest ${IGNITY_SYNC_DISKS} -eq 1 }
   s6-sync

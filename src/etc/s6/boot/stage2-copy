@@ -1,4 +1,4 @@
-#!/bin/execlineb -S1
+#!/usr/lib/ignity/bin/execlineb -S1
 
 # Copy user provided files of /etc/ignity/<name> to /run/ignity/<name>.
 # Although s6-hiercopy is prefered, and until it doesn't support 'follow symlinks'

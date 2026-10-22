@@ -10,19 +10,6 @@ description: |
 vendor: "techcode.io"
 homepage: "https://github.com/techcode-io/ignity"
 license: "Apache-2.0"
-# The bundled binaries are the ones of execline, s6 and s6-portable-utils
-provides:
-  - "execline"
-  - "s6"
-  - "s6-portable-utils"
-conflicts:
-  - "execline"
-  - "s6"
-  - "s6-portable-utils"
-replaces:
-  - "execline"
-  - "s6"
-  - "s6-portable-utils"
 overrides:
   # useradd, groupadd and getent (preboot, gen-accounts), GNU find (fix-perms) and grep (gen-accounts)
   deb:
@@ -40,21 +27,14 @@ overrides:
       - "shadow"
       - "findutils"
       - "grep"
+# execline, s6 and s6-portable-utils are installed in /usr/lib/ignity: nothing conflicts with the
+# distribution, /init puts them first in PATH
+scripts:
+  postinstall: ./distributions/packages/postinstall.sh
+  preremove: ./distributions/packages/preremove.sh
 contents:
-  - src: ./dist/ignity/bin/*
-    dst: /bin/
-
-  # cd, umask and wait: rpm distributions ship their own (bash)
-  - src: ./dist/ignity/posix/*
-    dst: /bin/
-    packager: deb
-
-  - src: ./dist/ignity/posix/*
-    dst: /bin/
-    packager: apk
-
-  - src: ./dist/ignity/usr/libexec
-    dst: /usr/libexec
+  - src: ./dist/ignity/usr/lib/ignity
+    dst: /usr/lib/ignity
     type: tree
 
   - src: ./dist/ignity/init
@@ -67,11 +47,10 @@ contents:
   - src: ./dist/ignity/usr/bin/*
     dst: /usr/bin/
 
-  - src: ./dist/ignity/etc/ignity/init/00-container-discover
-    dst: /etc/ignity/init/00-container-discover
-    type: config|noreplace
-
   - dst: /etc/ignity/envs
+    type: dir
+
+  - dst: /etc/ignity/init
     type: dir
 
   - dst: /etc/ignity/services

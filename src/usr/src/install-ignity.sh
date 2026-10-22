@@ -20,6 +20,10 @@ readonly SKALIBS_VERSION="2.15.1.0"
 readonly EXECLINE_VERSION="2.9.9.2"
 readonly S6_VERSION="2.15.1.0"
 readonly S6_PORTABLE_UTILS_VERSION="2.3.1.2"
+# execline, s6 and s6-portable-utils stay out of the root filesystem: /init puts them first in PATH.
+# They call each other by their path, PATH or not
+readonly IGNITY_LIB_DIR="/usr/lib/ignity"
+readonly IGNITY_CONFIGURE="--bindir=${IGNITY_LIB_DIR}/bin --libexecdir=${IGNITY_LIB_DIR}/libexec --enable-absolute-paths"
 BUILD_DEPENDENCIES="ca-certificates build-essential git"
 
 # Fine tuning
@@ -172,13 +176,14 @@ apt-get install --no-install-recommends -y ${BUILD_DEPENDENCIES}
 
 # Shallow clone skalibs, execline, s6, s6-portable-utils
 pkg::install "skalibs" "${SKALIBS_VERSION}" "${SKALIBS_URL}" "--enable-shared"
-pkg::install "execline" "${EXECLINE_VERSION}" "${EXECLINE_URL}" "--enable-shared"
-pkg::install "s6" "${S6_VERSION}" "${S6_URL}"
-pkg::install "s6-portable-utils" "${S6_PORTABLE_UTILS_VERSION}" "${S6_PORTABLE_UTILS_URL}"
+pkg::install "execline" "${EXECLINE_VERSION}" "${EXECLINE_URL}" "--enable-shared ${IGNITY_CONFIGURE}"
+pkg::install "s6" "${S6_VERSION}" "${S6_URL}" "${IGNITY_CONFIGURE}"
+pkg::install "s6-portable-utils" "${S6_PORTABLE_UTILS_VERSION}" "${S6_PORTABLE_UTILS_URL}" "${IGNITY_CONFIGURE}"
 
-# execline's wait, by the path stage3 calls it with (see distributions/build/build-ignity.sh)
-mkdir -p /usr/libexec/ignity
-ln -sf /bin/wait /usr/libexec/ignity/wait
+# For user scripts with a #!/bin/execlineb shebang, unless another execline provides one
+if [ ! -e /bin/execlineb ] && [ ! -L /bin/execlineb ]; then
+  ln -s "${IGNITY_LIB_DIR}/bin/execlineb" /bin/execlineb
+fi
 
 # Diff to do iso uninstall
 dpkg -l | awk '{print $2;}' > /tmp/after

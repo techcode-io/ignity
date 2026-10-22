@@ -72,7 +72,7 @@ Containers of a pod share files through a user-mounted volume. No env is handed 
 ## Key Components
 
 **Boot Stages:**
-- `/init` — Entry point (execlineb wrapper calling stage1)
+- `/init` — Entry point (execlineb wrapper calling stage1, with `/usr/lib/ignity/bin` first in PATH)
 - `/etc/s6/boot/stage{1,2,3}` — Core boot logic
 - `/etc/s6/boot/stage1-envs`, `/etc/s6/boot/stage2-{copy,init,services,cmd}` — Boot sub-scripts
 - `/etc/s6/services/.s6-svscan/{crash,finish}` — s6 supervision control
@@ -87,7 +87,8 @@ Containers of a pod share files through a user-mounted volume. No env is handed 
 
 **Installation:**
 - `/usr/src/install-ignity.sh` — Compiles and installs s6, execline, skalibs from source (Debian/Ubuntu). Its `readonly *_VERSION`/`*_URL` are the single source of truth for the skarnet versions, also read by `distributions/build/build-ignity.sh` and bumped by `poe project:upgrade`
-- Linux packages (deb/rpm/apk, amd64/arm64): `distributions/build/` builds the bundle (static binaries in `/bin`, s6 helpers in `/usr/libexec`), `distributions/packages/nfpm.<arch>.yaml` packages it. The rpm leaves out execline's `cd`, `umask` and `wait` (owned by bash there), so ignity scripts must not use them (`execline-cd`, `execline-umask`, `/usr/libexec/ignity/wait`, which install-ignity.sh links too)
+- execline, s6 and s6-portable-utils live in `/usr/lib/ignity/{bin,libexec}` (both installs, built with `--enable-absolute-paths`), never in `/bin`. `/init` puts `/usr/lib/ignity/bin` first in PATH via `/usr/lib/ignity/libexec/with-ignity-path`; entry points that can run outside /init (`preboot`, `fix-perms`, `gen-accounts`, `load-envfile`, `with-retries`) start with it and find the other tools through the caller's PATH. Ignity's own scripts use `#!/usr/lib/ignity/bin/execlineb`; `/bin/execlineb` is only a compat link for user scripts, created when absent
+- Linux packages (deb/rpm/apk, amd64/arm64): `distributions/build/` builds the bundle (static binaries), `distributions/packages/nfpm.<arch>.yaml` packages it, `postinstall.sh`/`preremove.sh` manage the `/bin/execlineb` link. No Conflicts/Provides with the distribution's execline/s6
 
 ## Container Configuration (User-Provided)
 

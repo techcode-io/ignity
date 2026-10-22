@@ -1,4 +1,4 @@
-#!/bin/execlineb -S0
+#!/usr/lib/ignity/bin/execlineb -S0
 
 # Build /run/ignity/envs-defaults from the /etc/ignity/envs files, in order (later files win).
 # Only the variables defined by those files are stored. The container environment is never

@@ -1,3 +1,4 @@
-#!/bin/execlineb -S0
-/bin/export PATH /usr/bin:/bin
+#!/usr/lib/ignity/bin/execlineb -S0
+# Can run outside /init
+/usr/lib/ignity/libexec/with-ignity-path
 envfile - $@

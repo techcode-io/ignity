@@ -1,2 +1,2 @@
-#!/bin/execlineb -S0
+#!/usr/lib/ignity/bin/execlineb -S0
 /etc/s6/boot/stage3 $@

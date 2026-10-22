@@ -21,6 +21,8 @@ trap runtime::stacktrace ERR
 readonly INSTALL_SCRIPT="src/usr/src/install-ignity.sh"
 readonly OUTPUT_DIR="${1:?usage: build-ignity.sh <output_dir>}"
 readonly BUILD_DIR="/tmp/build"
+# Same layout as the source install: out of the root filesystem, /init puts it first in PATH
+readonly IGNITY_LIB_DIR="/usr/lib/ignity"
 
 #######################################
 # Log a failure.
@@ -106,32 +108,29 @@ OUTPUT_ROOT="$(cd "${OUTPUT_DIR}" && pwd)"
 # skalibs is only needed at build time: it goes in the throwaway container, not in the bundle
 pkg::install "skalibs" "$(install::get SKALIBS_VERSION)" "$(install::get SKALIBS_URL)" "" \
   --disable-shared
+readonly CONFIGURE=(
+  --enable-static-libc --enable-absolute-paths
+  --bindir="${IGNITY_LIB_DIR}/bin" --libexecdir="${IGNITY_LIB_DIR}/libexec"
+)
 pkg::install "execline" "$(install::get EXECLINE_VERSION)" "$(install::get EXECLINE_URL)" "${OUTPUT_ROOT}" \
-  --enable-static-libc
-# s6 hardcodes the path of its helpers (s6-ftrigrd): keep them out of the root directory
+  "${CONFIGURE[@]}"
 pkg::install "s6" "$(install::get S6_VERSION)" "$(install::get S6_URL)" "${OUTPUT_ROOT}" \
-  --enable-static-libc --libexecdir=/usr/libexec
+  "${CONFIGURE[@]}"
 pkg::install "s6-portable-utils" "$(install::get S6_PORTABLE_UTILS_VERSION)" "$(install::get S6_PORTABLE_UTILS_URL)" "${OUTPUT_ROOT}" \
-  --enable-static-libc
+  "${CONFIGURE[@]}"
 
 # Only binaries are shipped: drop headers and static libraries
-rm -rf "${OUTPUT_ROOT}/usr/include" "${OUTPUT_ROOT}/usr/lib"
-runtime::try "strip binaries" strip "${OUTPUT_ROOT}"/bin/* "${OUTPUT_ROOT}"/usr/libexec/s6-*
+rm -rf "${OUTPUT_ROOT}/usr/include" "${OUTPUT_ROOT}"/usr/lib/*.a
+runtime::try "strip binaries" strip "${OUTPUT_ROOT}${IGNITY_LIB_DIR}"/bin/* "${OUTPUT_ROOT}${IGNITY_LIB_DIR}"/libexec/*
 
 # Every binary must be static, the bundle runs on any distribution
-for bin in "${OUTPUT_ROOT}"/bin/* "${OUTPUT_ROOT}"/usr/libexec/s6-*; do
+for bin in "${OUTPUT_ROOT}${IGNITY_LIB_DIR}"/bin/* "${OUTPUT_ROOT}${IGNITY_LIB_DIR}"/libexec/*; do
   if [ -n "$(readelf -l "${bin}" | grep INTERP || true)" ]; then
     log::failure "check ${bin} is static"
     exit 1
   fi
 done
 log::success "check binaries are static"
-
-# rpm distributions ship their own cd, umask and wait (bash): set them apart, only deb and apk ship them.
-# stage3 calls execline's wait by a path of its own, shipped by every package
-mkdir -p "${OUTPUT_ROOT}/posix" "${OUTPUT_ROOT}/usr/libexec/ignity"
-cp "${OUTPUT_ROOT}/bin/wait" "${OUTPUT_ROOT}/usr/libexec/ignity/wait"
-mv "${OUTPUT_ROOT}"/bin/{cd,umask,wait} "${OUTPUT_ROOT}/posix/"
 
 # Ignity itself, without the source install
 cp -a src/. "${OUTPUT_ROOT}/"

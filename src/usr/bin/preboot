@@ -1,7 +1,7 @@
-#!/bin/execlineb -S0
+#!/usr/lib/ignity/bin/execlineb -S0
 
-/bin/importas -D /usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin PATH PATH
-export PATH ${PATH}
+# Can run outside /init (build time)
+/usr/lib/ignity/libexec/with-ignity-path
 
 importas -D root USER USER
 importas -D 0 USERMAP_UID USERMAP_UID
