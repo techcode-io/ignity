@@ -20,8 +20,13 @@ foreground {
   importas -D 16000 -u IGNITY_SERVICES_GRACETIME IGNITY_SERVICES_GRACETIME
   # s6-svwait -t 0 waits forever: a grace time of 0 means do not wait
   if { eltest ${IGNITY_SERVICES_GRACETIME} -gt 0 }
-  elglob SERVICES /run/ignity/services-state/*
-  foreground { s6-svwait -D -t ${IGNITY_SERVICES_GRACETIME} ${SERVICES} }
+  # No service: nothing to wait for, the pattern must not reach s6-svwait
+  elglob -0 SERVICES /run/ignity/services-state/*
+  foreground {
+    forx -p d { ${SERVICES} }
+    importas -ui d d
+    s6-svwait -D -t ${IGNITY_SERVICES_GRACETIME} ${d}
+  }
   s6-sleep -m 200
 }
 

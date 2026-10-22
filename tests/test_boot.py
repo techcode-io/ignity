@@ -173,3 +173,9 @@ def test_accounts_never_duplicate_an_existing_id(image):
     assert result.returncode == 0, result.stdout + result.stderr
     assert "/accounts/passwd:0" in result.stdout
     assert "/accounts/group:0" in result.stdout
+
+
+def test_shutdown_without_services_is_clean(image):
+    result = run_in_container(image, "true")
+    assert result.returncode == 0
+    assert "s6-svwait" not in result.stderr
