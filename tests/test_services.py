@@ -26,3 +26,9 @@ def test_no_start_at_runtime_can_be_started(image):
     cmd = "rm -f /run/ignity/services-state/no-start-at-runtime/down && s6-svc -u /run/ignity/services-state/no-start-at-runtime && sleep 1"
     result = run_in_container(image, cmd)
     assert "no-start service at runtime" in result.stdout
+
+
+def test_shutdown_waits_for_services(image):
+    result = run_in_container(image, "true")
+    assert result.returncode == 0
+    assert "s6-svwait" not in result.stderr
