@@ -185,6 +185,9 @@ if [ ! -e /bin/execlineb ] && [ ! -L /bin/execlineb ]; then
   ln -s "${IGNITY_LIB_DIR}/bin/execlineb" /bin/execlineb
 fi
 
+# User provided directories, git doesn't keep them when empty (the packages create them too)
+mkdir -p /etc/ignity/envs /etc/ignity/init /etc/ignity/services /etc/ignity/perms /etc/ignity/finalize
+
 # Diff to do iso uninstall
 dpkg -l | awk '{print $2;}' > /tmp/after
 BUILD_DEPENDENCIES=$(diff /tmp/before /tmp/after | grep ">" | awk '{print $2;}' || true)
