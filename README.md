@@ -71,6 +71,28 @@ uv run poe package
 ```
 
 - It will create a tar archive containing ignity.
+- To build the Linux packages of the current architecture (on Linux only for the packages):
+
+```bash
+uv run poe build
+uv run poe package:deb
+uv run poe package:rpm
+uv run poe package:apk
+```
+
+- `build` compiles static (musl) `execline`, `s6` and `s6-portable-utils` in a container, into `dist/ignity`.
+- `package:<format>` packages it with [nfpm](https://nfpm.goreleaser.com) into `dist/ignity-<version>-linux-<arch>.<format>`.
+- To run the tests with ignity installed from these packages instead of from source:
+
+```bash
+IGNITY_INSTALL=package DOCKER_BASE_IMAGE=alpine:3 uv run poe test
+```
+
+### Release
+
+- Run the `Pre release` workflow with the version to release: it opens a PR bumping the version.
+- Once merged, run the `Release` workflow with the next development version (e.g. `0.2.0-dev`).
+- It tags the release, publishes the packages on GitHub Releases and opens a PR for the next iteration.
 
 ## 📖 Usage
 
@@ -106,6 +128,41 @@ uv run poe package
 | `USERMAP_GID`                          | User gid to map on files, and group of the `CMD` (see "How to run the CMD as a non root user")                        | 0               |
 | `USERMAP_UID`                          | User uid to map on files, and user of the `CMD` (see "How to run the CMD as a non root user")                         | 0               |
 
+### How to integrate ignity in your project from a package
+
+- Each [release](https://github.com/techcode-io/ignity/releases) ships `.deb`, `.rpm` and `.apk` packages for `amd64` and `arm64`.
+- They bundle static builds of `execline`, `s6` and `s6-portable-utils`: nothing is compiled in your image.
+- They install them in `/usr/lib/ignity` (see "Where ignity installs its binaries"): nothing conflicts with the packages of the distribution.
+
+```Dockerfile
+# Debian / Ubuntu
+ARG IGNITY_VERSION=0.1.0
+ARG TARGETARCH
+ADD https://github.com/techcode-io/ignity/releases/download/${IGNITY_VERSION}/ignity-${IGNITY_VERSION}-linux-${TARGETARCH}.deb /tmp/ignity.deb
+RUN apt-get update \
+ && apt-get install -y --no-install-recommends /tmp/ignity.deb \
+ && rm -rf /tmp/ignity.deb /var/lib/apt/lists/*
+```
+
+```Dockerfile
+# Fedora / RHEL / UBI
+ARG IGNITY_VERSION=0.1.0
+ARG TARGETARCH
+ADD https://github.com/techcode-io/ignity/releases/download/${IGNITY_VERSION}/ignity-${IGNITY_VERSION}-linux-${TARGETARCH}.rpm /tmp/ignity.rpm
+RUN dnf install -y /tmp/ignity.rpm && dnf clean all && rm -f /tmp/ignity.rpm
+```
+
+```Dockerfile
+# Alpine (the packages aren't signed, their provenance is attested instead)
+ARG IGNITY_VERSION=0.1.0
+ARG TARGETARCH
+ADD https://github.com/techcode-io/ignity/releases/download/${IGNITY_VERSION}/ignity-${IGNITY_VERSION}-linux-${TARGETARCH}.apk /tmp/ignity.apk
+RUN apk add --no-cache --allow-untrusted /tmp/ignity.apk && rm -f /tmp/ignity.apk
+```
+
+- `TARGETARCH` is set by `docker buildx` and `podman build`: otherwise, set it to `amd64` or `arm64`.
+- The provenance of a package can be checked with `gh attestation verify <file> --repo techcode-io/ignity`.
+
 ### How to integrate ignity in your project from source
 
 - You can simply `git clone` the project in the scope of the dockerfile.
@@ -115,6 +172,17 @@ uv run poe package
 # Install ignity from source
 COPY ignity/src /
 RUN bash /usr/src/install-ignity.sh \
+```
+
+### Where ignity installs its binaries
+
+- `execline`, `s6` and `s6-portable-utils` are installed in `/usr/lib/ignity/bin`, out of the root filesystem, whether ignity comes from a package or from source.
+- `/init` puts `/usr/lib/ignity/bin` first in `PATH`: `init`, `services`, `finalize` scripts and the `CMD` find them, before any command of the same name of the distribution (`cd`, `wait`, `umask` are shipped by `bash` on rpm distributions).
+- `/bin/execlineb` links to `/usr/lib/ignity/bin/execlineb` when the distribution has no `execline` of its own, so scripts with a `#!/bin/execlineb` shebang keep working.
+- Outside `/init` (`docker exec`, Kubernetes exec probes, `RUN` instructions calling your own scripts), `PATH` is the one of the image: add the directory to it.
+
+```Dockerfile
+ENV PATH="/usr/lib/ignity/bin:${PATH}"
 ```
 
 ### How to use ignity as `ENTRYPOINT`

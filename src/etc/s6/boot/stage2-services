@@ -1,4 +1,4 @@
-#!/bin/execlineb -S0
+#!/usr/lib/ignity/bin/execlineb -S0
 
 if {
   if -t { eltest -d /run/ignity/services }

@@ -2,6 +2,7 @@
 name: CI
 
 on:
+  workflow_call: ~
   pull_request:
   push:
     branches:
@@ -10,14 +11,109 @@ on:
 permissions:
   contents: read
 
+env:
+  # Ref: https://docs.astral.sh/uv/concepts/projects/sync/#checking-if-the-lockfile-is-up-to-date
+  UV_FROZEN: "true"
+
+## Concurrency only allowed in the main branch.
+## So old builds running for old commits within the same Pull Request are cancelled
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
+
 jobs:
   test:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
 
-      - name: Install uv
-        uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884 # v10.3.0
+      - name: Install environment
+        uses: ./.github/workflows/env-install
 
       - name: Run tests
         run: uv run poe test
+
+  # The bundle is packaged in the job building it: artifacts don't keep file modes
+  package:
+    permissions:
+      id-token: write
+      attestations: write
+      artifact-metadata: write
+    strategy:
+      matrix:
+        os:
+          - runner: ubuntu-24.04
+            target: linux-amd64
+          - runner: ubuntu-24.04-arm
+            target: linux-arm64
+    runs-on: ${{ matrix.os.runner }}
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Install environment
+        uses: ./.github/workflows/env-install
+
+      - name: Build
+        run: uv run poe build
+
+      - name: Build deb packages
+        run: uv run poe package:deb
+
+      - name: Build rpm packages
+        run: uv run poe package:rpm
+
+      - name: Build apk packages
+        run: uv run poe package:apk
+
+      - uses: actions/attest@v4
+        with:
+          subject-path: |
+            dist/*.deb
+            dist/*.rpm
+            dist/*.apk
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: ignity-package-${{ matrix.os.target }}
+          path: |
+            dist/*.deb
+            dist/*.rpm
+            dist/*.apk
+
+  # Run the whole suite with ignity installed from its package
+  sanitize:
+    needs:
+      - package
+    strategy:
+      fail-fast: false
+      matrix:
+        os:
+          - runner: ubuntu-24.04
+            target: linux-amd64
+          - runner: ubuntu-24.04-arm
+            target: linux-arm64
+        # Not ubuntu: its image already has a uid/gid 1000 user, which the tests map
+        base:
+          - debian:bookworm-slim
+          - alpine:3
+          - fedora:latest
+    runs-on: ${{ matrix.os.runner }}
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Install environment
+        uses: ./.github/workflows/env-install
+
+      - name: Install podman
+        run: command -v podman || { sudo apt-get update && sudo apt-get install -y podman; }
+
+      - uses: actions/download-artifact@v8
+        with:
+          name: ignity-package-${{ matrix.os.target }}
+          path: dist
+
+      - name: Run tests
+        run: uv run poe test
+        env:
+          IGNITY_INSTALL: package
+          DOCKER_BASE_IMAGE: ${{ matrix.base }}

@@ -1,6 +1,6 @@
 [project]
 name = "ignity"
-version = "0.1.0"
+version = "0.1.0-dev"
 description = "Dead simple process supervision for containers based on s6"
 readme = "README.md"
 requires-python = ">=3.13"
@@ -20,6 +20,19 @@ package = false
 help = "Setup project environment"
 cmd = "pre-commit install"
 
+[tool.poe.tasks."env:wipe"]
+help = "Wipe project environment."
+shell = """
+import shutil
+
+for path in ["dist"]:
+    try:
+        shutil.rmtree(path)
+    except FileNotFoundError as err:
+        print(f"Skipping {path} deletion...")
+"""
+interpreter = "python"
+
 [tool.poe.tasks."test"]
 help = "Run all tests."
 cmd = "pytest tests"
@@ -31,10 +44,51 @@ sequence = [
     { cmd = "tar zcvf dist/ignity.tar.gz -C src/ ." },
 ]
 
+[tool.poe.tasks.build]
+deps = ["env:wipe"]
+help = "Build the ignity bundle with static s6 binaries into dist/ignity."
+script = "scripts.tasks.build:run"
+
+[tool.poe.tasks."package:deb"]
+control.expr = "sys.platform"
+help = "Build debian packages."
+
+[[tool.poe.tasks."package:deb".switch]]
+case = "linux"
+script = "scripts.tasks.package:deb"
+
+[tool.poe.tasks."package:rpm"]
+control.expr = "sys.platform"
+help = "Build rpm packages."
+
+[[tool.poe.tasks."package:rpm".switch]]
+case = "linux"
+script = "scripts.tasks.package:rpm"
+
+[tool.poe.tasks."package:apk"]
+control.expr = "sys.platform"
+help = "Build alpine packages."
+
+[[tool.poe.tasks."package:apk".switch]]
+case = "linux"
+script = "scripts.tasks.package:apk"
+
 [tool.poe.tasks."project:check"]
 help = "Check for s6 ecosystem package updates without applying"
-script = "scripts.project:upgrade(dry_run=True)"
+script = "scripts.tasks.project:upgrade(dry_run=True)"
 
 [tool.poe.tasks."project:upgrade"]
 help = "Upgrade s6 ecosystem package versions in install-ignity.sh"
-script = "scripts.project:upgrade(dry_run=False)"
+script = "scripts.tasks.project:upgrade(dry_run=False)"
+
+[tool.poe.tasks."release:pre"]
+help = "Create a PR with changes for release."
+script = "scripts.tasks.release:pre"
+
+[tool.poe.tasks."release"]
+help = "Create a new ignity release."
+script = "scripts.tasks.release:run"
+
+[tool.poe.tasks."release:post"]
+help = "Prepare next iteration."
+script = "scripts.tasks.release:post"

@@ -1,4 +1,4 @@
-#!/bin/execlineb -S0
+#!/usr/lib/ignity/bin/execlineb -S0
 
 # This is the shutdown script, running as process 1.
 cd /

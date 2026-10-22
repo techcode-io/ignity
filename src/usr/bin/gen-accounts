@@ -1,4 +1,4 @@
-#!/bin/execlineb -P
+#!/usr/lib/ignity/bin/execlineb -P
 
 #
 # gen-accounts
@@ -11,7 +11,8 @@
 # Called by preboot when IGNITY_ACCOUNTS_DIR is set and USER doesn't exist.
 #
 
-/bin/export PATH /usr/bin:/bin
+# Can run outside /init
+/usr/lib/ignity/libexec/with-ignity-path
 
 importas -u IGNITY_ACCOUNTS_DIR IGNITY_ACCOUNTS_DIR
 importas -D root -u USER USER

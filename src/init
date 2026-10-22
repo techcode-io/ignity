@@ -1,5 +1,5 @@
-#!/bin/execlineb -S0
+#!/usr/lib/ignity/bin/execlineb -S0
 
-/bin/importas -D /usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin PATH PATH
-export PATH ${PATH}
+# execline, s6 and s6-portable-utils come first in PATH for the whole supervision tree
+/usr/lib/ignity/libexec/with-ignity-path
 /etc/s6/boot/stage1 $@

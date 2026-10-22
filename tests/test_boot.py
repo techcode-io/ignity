@@ -9,6 +9,21 @@ def test_execlineb_installed(image):
     assert run_in_container(image, "command -v execlineb").returncode == 0
 
 
+def test_binaries_out_of_root_filesystem(image):
+    # execline's wait, not the one of the distribution (bash on rpm distributions)
+    cmd = (
+        'test "$(type -P s6-svscan)" = /usr/lib/ignity/bin/s6-svscan'
+        ' && test "$(type -P wait)" = /usr/lib/ignity/bin/wait'
+        " && test ! -e /usr/bin/s6-svscan"
+    )
+    assert run_in_container(image, cmd).returncode == 0
+
+
+def test_execlineb_compat_link(image):
+    # For user scripts with a #!/bin/execlineb shebang
+    assert run_in_container(image, "test -x /bin/execlineb").returncode == 0
+
+
 def test_fix_perms_installed(image):
     assert run_in_container(image, "command -v fix-perms").returncode == 0
 

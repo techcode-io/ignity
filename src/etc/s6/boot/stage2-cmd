@@ -1,4 +1,4 @@
-#!/bin/execlineb -S0
+#!/usr/lib/ignity/bin/execlineb -S0
 
 # Run the CMD, dropping privileges to USERMAP_UID:USERMAP_GID when it makes sense:
 #  - they are both 0 (default): nothing to drop, the CMD runs as root like before

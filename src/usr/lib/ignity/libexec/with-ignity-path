@@ -1,0 +1,18 @@
+#!/usr/lib/ignity/bin/execlineb -S0
+
+#
+# with-ignity-path prog...
+#
+# Run prog with /usr/lib/ignity/bin first in PATH, where ignity installs execline, s6 and
+# s6-portable-utils: for the entry points that can run outside /init (build time, exec sessions).
+# Commands are called by their path here, PATH may not have them yet.
+#
+
+/usr/lib/ignity/bin/importas -D /usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin PATH PATH
+/usr/lib/ignity/bin/case -s -- ${PATH} {
+  /usr/lib/ignity/bin { $@ }
+  /usr/lib/ignity/bin:* { $@ }
+}
+# export looks prog up with the PATH it was given, exec with the new one
+/usr/lib/ignity/bin/export PATH /usr/lib/ignity/bin:${PATH}
+/usr/lib/ignity/bin/exec $@

@@ -24,7 +24,13 @@ uv run poe test tests/test_boot.py::test_execlineb_installed  # Single test
 **Building:**
 ```bash
 uv run poe package          # Create dist/ignity.tar.gz tarball from src/
+uv run poe build            # Static (musl) execline/s6/s6-portable-utils + src/ into dist/ignity, in a container
+uv run poe package:deb      # Also package:rpm, package:apk (Linux only): nfpm, dist/ignity-<version>-linux-<arch>.<format>
+IGNITY_INSTALL=package DOCKER_BASE_IMAGE=alpine:3 uv run poe test  # Suite against the package in dist/
 ```
+
+**Releasing** (GitHub Actions, workflow_dispatch, same flow as techcode-io/terranova):
+`Pre release` (version) opens a bump PR (`release:pre`) -> `Release` (next `x.y.z-dev`) reuses CI, tags `x.y.z` (no `v`), attaches the packages (`release`) and opens the next iteration PR (`release:post`). The version lives in `pyproject.toml` and `distributions/packages/nfpm.{amd64,arm64}.yaml`.
 
 All commands require:
 - uv (modern Python package manager)
@@ -66,7 +72,7 @@ Containers of a pod share files through a user-mounted volume. No env is handed 
 ## Key Components
 
 **Boot Stages:**
-- `/init` — Entry point (execlineb wrapper calling stage1)
+- `/init` — Entry point (execlineb wrapper calling stage1, with `/usr/lib/ignity/bin` first in PATH)
 - `/etc/s6/boot/stage{1,2,3}` — Core boot logic
 - `/etc/s6/boot/stage1-envs`, `/etc/s6/boot/stage2-{copy,init,services,cmd}` — Boot sub-scripts
 - `/etc/s6/services/.s6-svscan/{crash,finish}` — s6 supervision control
@@ -80,7 +86,9 @@ Containers of a pod share files through a user-mounted volume. No env is handed 
 - `/usr/bin/with-retries` — Retry command execution with backoff
 
 **Installation:**
-- `/usr/src/install-ignity.sh` — Compiles and installs s6, execline, skalibs from source
+- `/usr/src/install-ignity.sh` — Compiles and installs s6, execline, skalibs from source (Debian/Ubuntu). Its `readonly *_VERSION`/`*_URL` are the single source of truth for the skarnet versions, also read by `distributions/build/build-ignity.sh` and bumped by `poe project:upgrade`
+- execline, s6 and s6-portable-utils live in `/usr/lib/ignity/{bin,libexec}` (both installs, built with `--enable-absolute-paths`), never in `/bin`. `/init` puts `/usr/lib/ignity/bin` first in PATH via `/usr/lib/ignity/libexec/with-ignity-path`; entry points that can run outside /init (`preboot`, `fix-perms`, `gen-accounts`, `load-envfile`, `with-retries`) start with it and find the other tools through the caller's PATH. Ignity's own scripts use `#!/usr/lib/ignity/bin/execlineb`; `/bin/execlineb` is only a compat link for user scripts, created when absent
+- Linux packages (deb/rpm/apk, amd64/arm64): `distributions/build/` builds the bundle (static binaries), `distributions/packages/nfpm.<arch>.yaml` packages it, `postinstall.sh`/`preremove.sh` manage the `/bin/execlineb` link. No Conflicts/Provides with the distribution's execline/s6
 
 ## Container Configuration (User-Provided)
 
@@ -105,9 +113,10 @@ Scripts use numbered prefixes (00-, 01-, etc.) for deterministic ordering. Conve
 - Each module sets `IMAGE_KIND`; the shared `image` fixture (conftest) builds it from `tests/fixtures/<kind>/`: its own `Containerfile.tpl` if present, else ignity + `rootfs/` (see `DEFAULT_CONTAINERFILE`). Extra images can still be built with `build_image()`
 - Test fixtures include rootfs overlays with pre-configured services/scripts
 - conftest.py provides the `image` fixture, `build_image(kind)`, `run_in_container(image, cmd, extra_args)`, `env_args(**env)` (`-e` arguments) and `READ_ONLY` (read-only root arguments)
+- Containerfile templates install ignity with `{{IGNITY_INSTALL}}`: from source by default, from the dist/ package matching `DOCKER_BASE_IMAGE` (debian/ubuntu/fedora/alpine) with `IGNITY_INSTALL=package`
 
 **Test Flow:**
-1. `build_image()` renders Containerfile.tpl (substitutes `{{DOCKER_BASE_IMAGE}}`), builds with random tag via podman
+1. `build_image()` renders Containerfile.tpl (substitutes `{{DOCKER_BASE_IMAGE}}` and `{{IGNITY_INSTALL}}`), builds with random tag via podman
 2. `run_in_container()` executes shell command inside container with `/init` entrypoint
 3. Tests assert on exit codes and stdout content
 
@@ -126,9 +135,10 @@ Follow conventional commits: `type: description` (types: build, ci, docs, feat, 
 
 **Key Files:**
 - `pyproject.toml` — Project manifest, poe tasks, uv config
+- `scripts/binds/` — Thin wrappers around container (docker/podman), nfpm, git, gh; `scripts/tasks/` — poe task implementations (build, package, release, project)
 - `tests/conftest.py` — Pytest helpers, immutable tuples, type annotations
 - `tests/fixtures/` — Containerfile templates and rootfs overlays (not actual test code)
-- `.github/workflows/ci.yml` — Runs `uv run poe test` on PR/push
+- `.github/workflows/ci.yml` — On PR/push (and reused by release): `poe test` (source), `package` per arch (native runners), `sanitize` runs the suite from the packages on debian/ubuntu/alpine/fedora
 
 **Environment Variables (Runtime):**
 - `IGNITY_CMD_WAIT_FOR_SERVICES` — Wait for services before CMD (0/1)

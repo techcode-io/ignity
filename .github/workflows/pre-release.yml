@@ -1,0 +1,42 @@
+---
+name: Pre release
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "The version to release (e.g. 1.2.3). This workflow will automatically perform the required version bumps"
+        required: true
+
+permissions:
+  contents: read
+
+env:
+  # Ref: https://docs.astral.sh/uv/concepts/projects/sync/#checking-if-the-lockfile-is-up-to-date
+  UV_FROZEN: "true"
+
+concurrency:
+  group: ${{ github.workflow }}
+
+jobs:
+  pre-release:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - name: Setup github actions bot
+        uses: techcode-io/github-actions/setup-github-bot@setup-github-bot/v1
+
+      - name: Install environment
+        uses: ./.github/workflows/env-install
+
+      - name: Run pre-release step
+        run: uv run poe release:pre
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_VERSION: ${{ inputs.version }}

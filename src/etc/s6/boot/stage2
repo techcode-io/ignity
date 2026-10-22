@@ -1,4 +1,4 @@
-#!/bin/execlineb -S0
+#!/usr/lib/ignity/bin/execlineb -S0
 
 # This file is executed (not as process 1!) as soon as s6-svscan
 # starts, with the original stdin/out/err and the environment of stage 1.

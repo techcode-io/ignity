@@ -1,0 +1,66 @@
+name: "ignity"
+arch: "amd64"
+version: "0.1.0-dev"
+section: "default"
+priority: "extra"
+maintainer: "Adrien Mannocci <adrien.mannocci@gmail.com>"
+description: |
+  Ignity is a dead simple process supervision system for containers based on s6.
+  It bundles static builds of execline, s6 and s6-portable-utils.
+vendor: "techcode.io"
+homepage: "https://github.com/techcode-io/ignity"
+license: "Apache-2.0"
+overrides:
+  # useradd, groupadd and getent (preboot, gen-accounts), GNU find (fix-perms) and grep (gen-accounts)
+  deb:
+    depends:
+      - "passwd"
+      - "findutils"
+      - "grep"
+  rpm:
+    depends:
+      - "shadow-utils"
+      - "findutils"
+      - "grep"
+  apk:
+    depends:
+      - "shadow"
+      - "findutils"
+      - "grep"
+# execline, s6 and s6-portable-utils are installed in /usr/lib/ignity: nothing conflicts with the
+# distribution, /init puts them first in PATH
+scripts:
+  postinstall: ./distributions/packages/postinstall.sh
+  preremove: ./distributions/packages/preremove.sh
+contents:
+  - src: ./dist/ignity/usr/lib/ignity
+    dst: /usr/lib/ignity
+    type: tree
+
+  - src: ./dist/ignity/init
+    dst: /init
+
+  - src: ./dist/ignity/etc/s6
+    dst: /etc/s6
+    type: tree
+
+  - src: ./dist/ignity/usr/bin/*
+    dst: /usr/bin/
+
+  - dst: /etc/ignity/envs
+    type: dir
+
+  - dst: /etc/ignity/init
+    type: dir
+
+  - dst: /etc/ignity/services
+    type: dir
+
+  - dst: /etc/ignity/perms
+    type: dir
+
+  - dst: /etc/ignity/finalize
+    type: dir
+
+  - dst: /run/ignity
+    type: dir
