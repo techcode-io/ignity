@@ -1,6 +1,6 @@
 name: "ignity"
 arch: "amd64"
-version: "0.1.0-dev"
+version: "0.1.0"
 section: "default"
 priority: "extra"
 maintainer: "Adrien Mannocci <adrien.mannocci@gmail.com>"
