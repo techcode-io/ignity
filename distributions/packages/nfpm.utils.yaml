@@ -1,0 +1,37 @@
+# ARCH and VERSION are set by `poe package:<format>`
+name: "ignity-utils"
+arch: "${ARCH}"
+version: "${VERSION}"
+section: "default"
+priority: "extra"
+maintainer: "Adrien Mannocci <adrien.mannocci@gmail.com>"
+description: |
+  Execline implementation of the ignity utilities: fix-perms.
+  ignity-utils-rs is a drop-in replacement, written in Rust.
+vendor: "techcode.io"
+homepage: "https://github.com/techcode-io/ignity"
+license: "Apache-2.0"
+# What ignity-core depends on, also provided by ignity-utils-rs
+provides:
+  - "ignity-utils-impl"
+# Takes over fix-perms from the single package of ignity <= 0.1.0
+conflicts:
+  - "ignity"
+  - "ignity-utils-rs"
+replaces:
+  - "ignity"
+# execlineb (shebang, from ignity-core) and GNU find (fix-perms)
+depends:
+  - "ignity-core"
+  - "findutils"
+overrides:
+  apk:
+    # nfpm drops conflicts for apk, where they are `!` dependencies
+    depends:
+      - "ignity-core"
+      - "findutils"
+      - "!ignity"
+      - "!ignity-utils-rs"
+contents:
+  - src: ./dist/ignity/usr/bin/fix-perms
+    dst: /usr/bin/fix-perms
