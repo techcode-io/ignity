@@ -51,7 +51,7 @@ Ignity supervises container processes through three discrete stages:
 **Stage 2 (`/etc/s6/boot/stage2`):** Service & CMD Execution (depends on `IGNITY_MODE`)
 - `stage2-copy`: Copies `/etc/ignity/{init,finalize,services}` to `/run/ignity`, only what the mode needs
 - `stage2-init`: Executes the `/run/ignity/init/*` copies of `/etc/ignity/init/*` in order (skipped in `services` mode)
-- `stage2-cmd`: Runs the CMD, dropping to `USERMAP_UID:USERMAP_GID` via `s6-applyuidgid` only if PID 1 is root and the mapping isn't 0:0 (supplementary groups set to the gid)
+- `stage2-cmd`: Runs the CMD as PID 1 (root) by default. With `IGNITY_CMD_DROP_PRIVILEGES=1`, drops to `USERMAP_UID:USERMAP_GID` via `s6-applyuidgid` only if PID 1 is root and the mapping isn't 0:0 (supplementary groups set to the gid)
 - `stage2-services`: Copies `/run/ignity/services/*` into the live scandir `/run/ignity/services-state` and starts them under s6 (skipped in `init` mode)
 - Optionally runs CMD after services healthy (configurable delay via `IGNITY_CMD_WAIT_FOR_SERVICES`); skipped in `init` mode
 - Writes the exit status to `/run/ignity/stage2-exited` for stage 3; a failure (or `init` mode completing) stops the supervision tree
@@ -141,6 +141,7 @@ Follow conventional commits: `type: description` (types: build, ci, docs, feat, 
 - `.github/workflows/ci.yml` — On PR/push (and reused by release): `poe test` (source), `package` per arch (native runners), `sanitize` runs the suite from the packages on debian/ubuntu/alpine/fedora
 
 **Environment Variables (Runtime):**
+- `IGNITY_CMD_DROP_PRIVILEGES` — Run the CMD as `USERMAP_UID:USERMAP_GID` instead of root (0/1, default 0)
 - `IGNITY_CMD_WAIT_FOR_SERVICES` — Wait for services before CMD (0/1)
 - `IGNITY_CMD_WAIT_FOR_SERVICES_MAXTIME` — Wait timeout in milliseconds (default 5000)
 - `IGNITY_KILL_GRACETIME` — Shutdown grace period in ms (default 3000)
@@ -149,7 +150,7 @@ Follow conventional commits: `type: description` (types: build, ci, docs, feat, 
 - `IGNITY_SKIP_PERMS` — Skip permission fixing (0/1)
 - `IGNITY_ACCOUNTS_DIR` — Write account files there instead of creating USER in /etc (read-only root filesystem, see `gen-accounts`)
 - `IGNITY_MODE` — `full` (default) | `init` (init scripts only, then exit) | `services` (skip init scripts); for Kubernetes init containers. No env is handed between containers, share files through a volume
-- `USER`, `USERMAP_UID`, `USERMAP_GID` — Non-root user mapping; also the uid/gid the CMD drops to (`stage2-cmd`) when PID 1 is root and the mapping isn't 0:0
+- `USER`, `USERMAP_UID`, `USERMAP_GID` — Non-root user mapping; also the uid/gid the CMD drops to (`stage2-cmd`) with `IGNITY_CMD_DROP_PRIVILEGES=1`, when PID 1 is root and the mapping isn't 0:0
 
 ## Language & Implementation Details
 

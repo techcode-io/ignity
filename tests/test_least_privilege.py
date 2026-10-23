@@ -10,7 +10,7 @@ IMAGE_KIND = "split"
 
 # What ignity needs when PID 1 is root:
 #  - CHOWN, FOWNER, DAC_OVERRIDE: fix-perms (chown, chmod, then traverse what it just handed over)
-#  - SETUID, SETGID: dropping privileges (CMD with USERMAP_*, services)
+#  - SETUID, SETGID: dropping privileges (CMD with IGNITY_CMD_DROP_PRIVILEGES, services)
 #  - KILL: signalling processes running as another uid (stop services, shutdown)
 MINIMAL = (
     "--cap-drop=ALL",
@@ -24,7 +24,9 @@ MINIMAL = (
     *READ_ONLY,
     # Written by the init script of the fixture
     "--tmpfs=/shared",
-    *env_args(USERMAP_UID=1000, USERMAP_GID=1000, IGNITY_SERVICES_GRACETIME=3000),
+    *env_args(
+        USERMAP_UID=1000, USERMAP_GID=1000, IGNITY_CMD_DROP_PRIVILEGES=1, IGNITY_SERVICES_GRACETIME=3000,
+    ),
 )
 
 
@@ -80,7 +82,9 @@ def _args(without: str | None = None) -> tuple[str, ...]:
         *caps,
         "--security-opt=no-new-privileges",
         # Not read-only: /data is part of the image and has to be fixed by fix-perms
-        *env_args(USERMAP_UID=1234, USERMAP_GID=1234, IGNITY_SERVICES_GRACETIME=3000),
+        *env_args(
+            USERMAP_UID=1234, USERMAP_GID=1234, IGNITY_CMD_DROP_PRIVILEGES=1, IGNITY_SERVICES_GRACETIME=3000,
+        ),
     )
 
 

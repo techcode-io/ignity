@@ -116,6 +116,7 @@ IGNITY_INSTALL=package DOCKER_BASE_IMAGE=alpine:3 uv run poe test
 
 | Parameter                              | Description                                                                                                           | Value (Current) |
 |----------------------------------------|-----------------------------------------------------------------------------------------------------------------------|-----------------|
+| `IGNITY_CMD_DROP_PRIVILEGES`           | Run the `CMD` as `USERMAP_UID:USERMAP_GID` instead of root (0/1, see "How to run the CMD as a non root user")        | 0               |
 | `IGNITY_CMD_WAIT_FOR_SERVICES_MAXTIME` | The maximum time (in milliseconds) the services could take to bring up before proceding to CMD executing              | 5000            |
 | `IGNITY_CMD_WAIT_FOR_SERVICES`         | In order to proceed executing CMD overlay will wait until services are up                                             | 0               |
 | `IGNITY_KILL_FINALIZE_MAXTIME`         | The maximum time (in milliseconds) a script in `/etc/ignity/finalize` could take before sending a `KILL` signal to it | 5000            |
@@ -125,8 +126,8 @@ IGNITY_INSTALL=package DOCKER_BASE_IMAGE=alpine:3 uv run poe test
 | `IGNITY_SERVICES_GRACETIME`            | How long (in milliseconds) `ignity` should wait services down before sending a down signal                            | 16000           |
 | `IGNITY_SYNC_DISKS`                    | Call `s6-sync` before and after sending the termination signals (0/1)                                                 | 1               |
 | `USER`                                 | User name to map with uid and gid                                                                                     | root            |
-| `USERMAP_GID`                          | User gid to map on files, and group of the `CMD` (see "How to run the CMD as a non root user")                        | 0               |
-| `USERMAP_UID`                          | User uid to map on files, and user of the `CMD` (see "How to run the CMD as a non root user")                         | 0               |
+| `USERMAP_GID`                          | User gid to map on files, and group of the `CMD` with `IGNITY_CMD_DROP_PRIVILEGES=1`                                  | 0               |
+| `USERMAP_UID`                          | User uid to map on files, and user of the `CMD` with `IGNITY_CMD_DROP_PRIVILEGES=1`                                   | 0               |
 
 ### How to integrate ignity in your project from a package
 
@@ -321,8 +322,8 @@ exec with-env -k 'HOME,LANG,TZ,APP_*' -d /run/secrets/myapp myapp
   from getting it back. Services running with the same uid as PID 1 can read it.
 - Dropping the uid does not clear the environment: a service still starts with the full container environment unless you
   narrow it with `-k`.
-- The `CMD` runs as `USERMAP_UID:USERMAP_GID` (see below), but it still starts with the full environment unless you
-  narrow it. Init and finalize scripts run with the uid of PID 1 (root), and the full environment, unless they drop
+- The `CMD` runs as root, or as `USERMAP_UID:USERMAP_GID` with `IGNITY_CMD_DROP_PRIVILEGES=1` (see below), but it
+  still starts with the full environment unless you narrow it. Init and finalize scripts run with the uid of PID 1 (root), and the full environment, unless they drop
   privileges themselves.
 
 ### How to use ignity with Kubernetes init containers
@@ -404,7 +405,7 @@ USER ${USERMAP_UID}:${USERMAP_GID}
 | `CHOWN`        | `fix-perms` changing owners                                                                  |
 | `FOWNER`       | `fix-perms` changing modes of files that belong to another uid (the one it just handed over) |
 | `DAC_OVERRIDE` | `fix-perms` reading what it just handed over (a `0700` directory of another uid)             |
-| `SETUID`       | The `CMD` (`USERMAP_UID`) and services dropping privileges                                   |
+| `SETUID`       | The `CMD` (`IGNITY_CMD_DROP_PRIVILEGES`) and services dropping privileges                    |
 | `SETGID`       | Same, including supplementary groups                                                         |
 | `KILL`         | Sending signals to processes running as another uid: stopping services, shutdown (without it the container never stops) |
 
@@ -412,8 +413,9 @@ USER ${USERMAP_UID}:${USERMAP_GID}
   Add `FSETID` only if your `perms` files set setuid or setgid bits.
 - This list comes from reading the scripts and is checked by `tests/test_least_privilege.py`. It doesn't cover what your
   own init scripts and services do.
-- A process that drops privileges loses its capabilities (the `CMD` ends up with none), so they only concern PID 1, the
-  init and finalize scripts.
+- A process that drops privileges loses its capabilities (the `CMD` ends up with none with
+  `IGNITY_CMD_DROP_PRIVILEGES=1`), so they only concern PID 1, the init and finalize scripts, and the `CMD` when it
+  runs as root.
 - `allowPrivilegeEscalation: false` is fine: nothing relies on setuid binaries.
 
 **Read-only root filesystem**
@@ -442,6 +444,7 @@ spec:
       env:
         - { name: USERMAP_UID, value: "1000" }
         - { name: USERMAP_GID, value: "1000" }
+        - { name: IGNITY_CMD_DROP_PRIVILEGES, value: "1" }
       securityContext:
         runAsUser: 0
         allowPrivilegeEscalation: false
@@ -503,6 +506,7 @@ spec:
         - { name: USER, value: app }
         - { name: USERMAP_UID, value: "1000" }
         - { name: USERMAP_GID, value: "1000" }
+        - { name: IGNITY_CMD_DROP_PRIVILEGES, value: "1" }
       securityContext:
         readOnlyRootFilesystem: true
         allowPrivilegeEscalation: false
@@ -544,9 +548,11 @@ spec:
 
 ### How to run the CMD as a non root user
 
-- By default `USERMAP_UID` and `USERMAP_GID` are `0`, so the `CMD` runs as root, like PID 1.
-- If PID 1 is root and either of them is not `0`, the `CMD` runs as `USERMAP_UID:USERMAP_GID`. Supplementary groups are
-  replaced by `USERMAP_GID`, the `CMD` doesn't keep the groups of root.
+- By default the `CMD` runs as root, like PID 1, even when `USERMAP_UID` and `USERMAP_GID` are set (they are then only
+  used for `perms`): the `CMD` is mostly there to debug or test.
+- Set `IGNITY_CMD_DROP_PRIVILEGES=1` to opt in. If PID 1 is root and either of `USERMAP_UID` and `USERMAP_GID` is not
+  `0`, the `CMD` then runs as `USERMAP_UID:USERMAP_GID`. Supplementary groups are replaced by `USERMAP_GID`, the `CMD`
+  doesn't keep the groups of root.
 - Only the `CMD` is affected. Init scripts, finalize scripts and services keep running as PID 1, and services drop
   privileges themselves in their `run` script if they need it.
 - The environment is not changed: `HOME`, `USER` and the other variables stay as they are, so set them in the container
@@ -561,6 +567,7 @@ spec:
 env:
   - { name: USERMAP_UID, value: "1000" }
   - { name: USERMAP_GID, value: "1000" }
+  - { name: IGNITY_CMD_DROP_PRIVILEGES, value: "1" }
 ```
 
 ### How to run a container in read-only mode
@@ -641,6 +648,8 @@ exec s6-setuidgid daemon myservice
 It is possible somehow to tweak `ignity` behaviour by providing an already predefined set of environment variables to
 the execution context:
 
+- `IGNITY_CMD_DROP_PRIVILEGES` (default = 0): Run the `CMD` as `USERMAP_UID:USERMAP_GID` instead of root. See "How to
+  run the CMD as a non root user".
 - `IGNITY_CMD_WAIT_FOR_SERVICES_MAXTIME` (default = 5000): The maximum time (in milliseconds) the services could take to
   bring up before proceding to CMD executing.
 - `IGNITY_CMD_WAIT_FOR_SERVICES` (default = 0): In order to proceed executing CMD overlay will wait until services are

@@ -28,7 +28,11 @@ if {
   exit 1
 }
 if {
-  ifelse { eltest ${USERMAP_UID} -ge 0 -a ${USERMAP_GID} -ge 0 } { exit 0 }
+  # eltest -ge accepts values like 1000:0, check the digits instead
+  ifelse {
+    if { pipeline { s6-echo -n -- ${USERMAP_UID} } grep -Eqzx "[0-9]+" }
+    pipeline { s6-echo -n -- ${USERMAP_GID} } grep -Eqzx "[0-9]+"
+  } { exit 0 }
   fdmove -c 1 2
   foreground { s6-echo -- "[supervisor/accounts] USERMAP_UID and USERMAP_GID must be numbers" }
   exit 1

@@ -1,8 +1,12 @@
 #!/usr/lib/ignity/bin/execlineb -S0
 
-# Run the CMD, dropping privileges to USERMAP_UID:USERMAP_GID when it makes sense:
-#  - they are both 0 (default): nothing to drop, the CMD runs as root like before
+# Run the CMD, as PID 1 (root) unless IGNITY_CMD_DROP_PRIVILEGES=1.
+# When opted in, it drops privileges to USERMAP_UID:USERMAP_GID when it makes sense:
+#  - they are both 0 (default): nothing to drop, the CMD runs as root
 #  - PID 1 is not root (e.g. USER set in the Dockerfile): it can't change uid, the CMD runs as is
+importas -D 0 IGNITY_CMD_DROP_PRIVILEGES IGNITY_CMD_DROP_PRIVILEGES
+ifelse { eltest ${IGNITY_CMD_DROP_PRIVILEGES} -ne 1 } { $@ }
+
 importas -D 0 USERMAP_UID USERMAP_UID
 importas -D 0 USERMAP_GID USERMAP_GID
 

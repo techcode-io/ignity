@@ -45,11 +45,21 @@ def test_cmd_runs_as_root_by_default(image):
     assert "UID=0 GID=0" in result.stdout
 
 
+def test_cmd_stays_root_with_usermap_by_default(image):
+    result = run_in_container(
+        image,
+        "echo UID=$(id -u) GID=$(id -g)",
+        extra_args=env_args(USERMAP_UID=1000, USERMAP_GID=1000),
+    )
+    assert result.returncode == 0
+    assert "UID=0 GID=0" in result.stdout
+
+
 def test_cmd_drops_privileges_to_usermap(image):
     result = run_in_container(
         image,
         "echo UID=$(id -u) GID=$(id -g) GROUPS=$(id -G)",
-        extra_args=env_args(USERMAP_UID=1000, USERMAP_GID=1000),
+        extra_args=env_args(USERMAP_UID=1000, USERMAP_GID=1000, IGNITY_CMD_DROP_PRIVILEGES=1),
     )
     assert result.returncode == 0
     assert "UID=1000 GID=1000 GROUPS=1000" in result.stdout
@@ -61,6 +71,7 @@ def test_cmd_dropped_cannot_read_pid1_environ(image):
         "cat /proc/1/environ >/dev/null 2>&1; echo RC=$?",
         extra_args=[
             "-e", "USERMAP_UID=1000", "-e", "USERMAP_GID=1000", "-e", "MYSECRET=x",
+            "-e", "IGNITY_CMD_DROP_PRIVILEGES=1",
         ],
     )
     assert "RC=0" not in result.stdout
@@ -71,7 +82,7 @@ def test_cmd_exit_code_kept_when_dropping_privileges(image):
     result = run_in_container(
         image,
         "exit 7",
-        extra_args=env_args(USERMAP_UID=1000, USERMAP_GID=1000),
+        extra_args=env_args(USERMAP_UID=1000, USERMAP_GID=1000, IGNITY_CMD_DROP_PRIVILEGES=1),
     )
     assert result.returncode == 7
 
@@ -115,6 +126,7 @@ def test_accounts_of_init_container_mounted_in_main_container(image, tmp_path):
             *READ_ONLY,
             "-v", f"{tmp_path}/passwd:/etc/passwd:ro",
             "-v", f"{tmp_path}/group:/etc/group:ro",
+            "-e", "IGNITY_CMD_DROP_PRIVILEGES=1",
             *_ACCOUNT,
         ],
     )
@@ -159,6 +171,7 @@ def test_accounts_reject_non_numeric_ids(image):
         ],
     )
     assert result.returncode != 0
+    assert "must be numbers" in result.stdout + result.stderr
 
 
 def test_accounts_never_duplicate_an_existing_id(image):
