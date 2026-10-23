@@ -10,12 +10,6 @@ from scripts.binds.gh import Gh
 from scripts.binds.git import Git
 
 PYPROJECT_PATH: Final[Path] = Path("pyproject.toml")
-DISTRIBUTIONS_NFPM_AMD64_PATH: Final[Path] = Path(
-    "distributions/packages/nfpm.amd64.yaml"
-)
-DISTRIBUTIONS_NFPM_ARM64_PATH: Final[Path] = Path(
-    "distributions/packages/nfpm.arm64.yaml"
-)
 # Packages built for the release: deb, rpm and apk
 RELEASE_ASSETS_PATTERNS: Final[tuple[str, ...]] = (
     "ignity*.deb",
@@ -47,18 +41,10 @@ def __update_file_version(file_path: Path, pattern: str, replacement: str) -> No
 
 
 def __set_version(version: str) -> None:
-    """Update version in pyproject.toml and the nfpm package configs."""
+    """Update version in pyproject.toml, which the nfpm package configs are given."""
     # Update project version
     __update_file_version(
         PYPROJECT_PATH, r"version = \"(.+)\"", f'version = "{version}"'
-    )
-
-    # Update nfpm package versions
-    __update_file_version(
-        DISTRIBUTIONS_NFPM_AMD64_PATH, r"version: \"(.+)\"", f'version: "{version}"'
-    )
-    __update_file_version(
-        DISTRIBUTIONS_NFPM_ARM64_PATH, r"version: \"(.+)\"", f'version: "{version}"'
     )
 
 

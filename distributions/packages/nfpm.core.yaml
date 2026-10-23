@@ -1,6 +1,7 @@
-name: "ignity"
-arch: "arm64"
-version: "0.1.1-dev"
+# ARCH and VERSION are set by `poe package:<format>`
+name: "ignity-core"
+arch: "${ARCH}"
+version: "${VERSION}"
 section: "default"
 priority: "extra"
 maintainer: "Adrien Mannocci <adrien.mannocci@gmail.com>"
@@ -10,28 +11,40 @@ description: |
 vendor: "techcode.io"
 homepage: "https://github.com/techcode-io/ignity"
 license: "Apache-2.0"
+# Takes over the single package of ignity <= 0.1.0
+conflicts:
+  - "ignity"
+replaces:
+  - "ignity"
 overrides:
-  # useradd, groupadd and getent (preboot, gen-accounts), GNU find (fix-perms) and grep (gen-accounts)
+  # fix-perms (ignity-utils or ignity-utils-rs, which both provide ignity-utils-impl), useradd,
+  # groupadd and getent (preboot, gen-accounts) and grep (gen-accounts)
   deb:
     depends:
+      - "ignity-utils-impl"
       - "passwd"
-      - "findutils"
       - "grep"
   rpm:
     depends:
+      - "ignity-utils-impl"
       - "shadow-utils"
-      - "findutils"
       - "grep"
   apk:
+    # nfpm drops conflicts for apk, where they are `!` dependencies
     depends:
+      - "ignity-utils-impl"
       - "shadow"
-      - "findutils"
       - "grep"
+      - "!ignity"
 # execline, s6 and s6-portable-utils are installed in /usr/lib/ignity: nothing conflicts with the
 # distribution, /init puts them first in PATH
 scripts:
   postinstall: ./distributions/packages/postinstall.sh
   preremove: ./distributions/packages/preremove.sh
+rpm:
+  scripts:
+    # The obsoleted ignity package is erased after %post, and its %preun removes the link
+    posttrans: ./distributions/packages/postinstall.sh
 contents:
   - src: ./dist/ignity/usr/lib/ignity
     dst: /usr/lib/ignity
@@ -44,8 +57,20 @@ contents:
     dst: /etc/s6
     type: tree
 
-  - src: ./dist/ignity/usr/bin/*
-    dst: /usr/bin/
+  - src: ./dist/ignity/usr/bin/gen-accounts
+    dst: /usr/bin/gen-accounts
+
+  - src: ./dist/ignity/usr/bin/load-envfile
+    dst: /usr/bin/load-envfile
+
+  - src: ./dist/ignity/usr/bin/preboot
+    dst: /usr/bin/preboot
+
+  - src: ./dist/ignity/usr/bin/with-env
+    dst: /usr/bin/with-env
+
+  - src: ./dist/ignity/usr/bin/with-retries
+    dst: /usr/bin/with-retries
 
   - dst: /etc/ignity/envs
     type: dir

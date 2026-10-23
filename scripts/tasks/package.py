@@ -5,11 +5,13 @@ from pathlib import Path
 from scripts.binds.nfpm import Nfpm
 
 DISTRIBUTIONS_PACKAGES_PATH = "distributions/packages"
+# ignity-core, and ignity-utils providing ignity-utils-impl (like ignity-utils-rs)
+PACKAGES = ("core", "utils")
 PYPROJECT_PATH = Path("pyproject.toml")
 
 
 def __build_package(packager: str) -> None:
-    """Package the current architecture bundle with nfpm."""
+    """Package the current architecture bundle with nfpm, one package per PACKAGES."""
     arch = platform.machine().lower()
     arch = "amd64" if arch == "x86_64" else arch
     arch = "arm64" if arch == "aarch64" else arch
@@ -18,11 +20,14 @@ def __build_package(packager: str) -> None:
     with PYPROJECT_PATH.open("rb") as file:
         version = tomllib.load(file)["project"]["version"]
 
-    Nfpm().package(
-        config=f"{DISTRIBUTIONS_PACKAGES_PATH}/nfpm.{arch}.yaml",
-        target=f"/tmp/dist/ignity-{version}-linux-{arch}.{packager}",
-        packager=packager,
-    )
+    nfpm = Nfpm()
+    for package in PACKAGES:
+        nfpm.package(
+            config=f"{DISTRIBUTIONS_PACKAGES_PATH}/nfpm.{package}.yaml",
+            target=f"/tmp/dist/ignity-{package}-{version}-linux-{arch}.{packager}",
+            packager=packager,
+            env={"ARCH": arch, "VERSION": version},
+        )
 
 
 def deb() -> None:

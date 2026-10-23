@@ -81,7 +81,7 @@ uv run poe package:apk
 ```
 
 - `build` compiles static (musl) `execline`, `s6` and `s6-portable-utils` in a container, into `dist/ignity`.
-- `package:<format>` packages it with [nfpm](https://nfpm.goreleaser.com) into `dist/ignity-<version>-linux-<arch>.<format>`.
+- `package:<format>` packages it with [nfpm](https://nfpm.goreleaser.com) into `dist/ignity-core-<version>-linux-<arch>.<format>` and `dist/ignity-utils-<version>-linux-<arch>.<format>`.
 - To run the tests with ignity installed from these packages instead of from source:
 
 ```bash
@@ -133,35 +133,47 @@ IGNITY_INSTALL=package DOCKER_BASE_IMAGE=alpine:3 uv run poe test
 - Each [release](https://github.com/techcode-io/ignity/releases) ships `.deb`, `.rpm` and `.apk` packages for `amd64` and `arm64`.
 - They bundle static builds of `execline`, `s6` and `s6-portable-utils`: nothing is compiled in your image.
 - They install them in `/usr/lib/ignity` (see "Where ignity installs its binaries"): nothing conflicts with the packages of the distribution.
+- ignity comes in two packages, to install together:
+  - `ignity-core`: the boot stages, `execline`, `s6`, `s6-portable-utils` and the utilities, except `fix-perms`.
+  - `ignity-utils`: the execline implementation of `fix-perms`.
 
 ```Dockerfile
 # Debian / Ubuntu
 ARG IGNITY_VERSION=0.1.0
 ARG TARGETARCH
-ADD https://github.com/techcode-io/ignity/releases/download/${IGNITY_VERSION}/ignity-${IGNITY_VERSION}-linux-${TARGETARCH}.deb /tmp/ignity.deb
+ADD https://github.com/techcode-io/ignity/releases/download/${IGNITY_VERSION}/ignity-core-${IGNITY_VERSION}-linux-${TARGETARCH}.deb \
+    https://github.com/techcode-io/ignity/releases/download/${IGNITY_VERSION}/ignity-utils-${IGNITY_VERSION}-linux-${TARGETARCH}.deb \
+    /tmp/ignity/
 RUN apt-get update \
- && apt-get install -y --no-install-recommends /tmp/ignity.deb \
- && rm -rf /tmp/ignity.deb /var/lib/apt/lists/*
+ && apt-get install -y --no-install-recommends /tmp/ignity/*.deb \
+ && rm -rf /tmp/ignity /var/lib/apt/lists/*
 ```
 
 ```Dockerfile
 # Fedora / RHEL / UBI
 ARG IGNITY_VERSION=0.1.0
 ARG TARGETARCH
-ADD https://github.com/techcode-io/ignity/releases/download/${IGNITY_VERSION}/ignity-${IGNITY_VERSION}-linux-${TARGETARCH}.rpm /tmp/ignity.rpm
-RUN dnf install -y /tmp/ignity.rpm && dnf clean all && rm -f /tmp/ignity.rpm
+ADD https://github.com/techcode-io/ignity/releases/download/${IGNITY_VERSION}/ignity-core-${IGNITY_VERSION}-linux-${TARGETARCH}.rpm \
+    https://github.com/techcode-io/ignity/releases/download/${IGNITY_VERSION}/ignity-utils-${IGNITY_VERSION}-linux-${TARGETARCH}.rpm \
+    /tmp/ignity/
+RUN dnf install -y /tmp/ignity/*.rpm && dnf clean all && rm -rf /tmp/ignity
 ```
 
 ```Dockerfile
 # Alpine (the packages aren't signed, their provenance is attested instead)
 ARG IGNITY_VERSION=0.1.0
 ARG TARGETARCH
-ADD https://github.com/techcode-io/ignity/releases/download/${IGNITY_VERSION}/ignity-${IGNITY_VERSION}-linux-${TARGETARCH}.apk /tmp/ignity.apk
-RUN apk add --no-cache --allow-untrusted /tmp/ignity.apk && rm -f /tmp/ignity.apk
+ADD https://github.com/techcode-io/ignity/releases/download/${IGNITY_VERSION}/ignity-core-${IGNITY_VERSION}-linux-${TARGETARCH}.apk \
+    https://github.com/techcode-io/ignity/releases/download/${IGNITY_VERSION}/ignity-utils-${IGNITY_VERSION}-linux-${TARGETARCH}.apk \
+    /tmp/ignity/
+RUN apk add --no-cache --allow-untrusted /tmp/ignity/*.apk && rm -rf /tmp/ignity
 ```
 
 - `TARGETARCH` is set by `docker buildx` and `podman build`: otherwise, set it to `amd64` or `arm64`.
 - The provenance of a package can be checked with `gh attestation verify <file> --repo techcode-io/ignity`.
+- `ignity-core` depends on the virtual `ignity-utils-impl` package, provided by `ignity-utils`.
+  [ignity-utils-rs](https://github.com/techcode-io/ignity-utils-rs) provides it too, with a static Rust `fix-perms` at the same path: install it instead of `ignity-utils`.
+- Up to `0.1.0`, ignity came as a single `ignity` package: `ignity-core` and `ignity-utils` replace it on upgrade (on Alpine, `apk del ignity` first: they conflict with it).
 
 ### How to integrate ignity in your project from source
 
