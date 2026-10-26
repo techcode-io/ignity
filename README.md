@@ -399,7 +399,7 @@ spec:
 ENV \
   USERMAP_UID="1000" \
   USERMAP_GID="1000" \
-  USER="exploit"
+  USER="app"
 RUN preboot
 USER ${USERMAP_UID}:${USERMAP_GID}
 ```
