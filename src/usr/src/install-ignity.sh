@@ -16,9 +16,9 @@ readonly SKALIBS_URL="https://github.com/skarnet/skalibs.git"
 readonly EXECLINE_URL="https://github.com/skarnet/execline.git"
 readonly S6_URL="https://github.com/skarnet/s6.git"
 readonly S6_PORTABLE_UTILS_URL="https://github.com/skarnet/s6-portable-utils.git"
-readonly SKALIBS_VERSION="2.15.1.0"
-readonly EXECLINE_VERSION="2.9.9.2"
-readonly S6_VERSION="2.15.1.0"
+readonly SKALIBS_VERSION="2.16.0.0"
+readonly EXECLINE_VERSION="2.10.0.0"
+readonly S6_VERSION="2.15.1.1"
 readonly S6_PORTABLE_UTILS_VERSION="2.3.1.2"
 # execline, s6 and s6-portable-utils stay out of the root filesystem: /init puts them first in PATH.
 # They call each other by their path, PATH or not

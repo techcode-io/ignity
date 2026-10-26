@@ -49,7 +49,7 @@ wheels = [
 
 [[package]]
 name = "ignity"
-version = "0.1.0.dev0"
+version = "0.1.2.dev0"
 source = { virtual = "." }
 
 [package.dev-dependencies]
